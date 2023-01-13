@@ -469,17 +469,17 @@ class MIKU(SATELLITE):
         self.dx = 0
         self.dy = 0
         # 左右キーに動きを対応させる
-        if pyxel.btn(pyxel.KEY_LEFT):
+        if pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_LEFT):
             if (self.x >= MIKU_SPEED): # 画面端に達しているときは当該方向への増分をセットしない
                 self.dx = -MIKU_SPEED
-        elif pyxel.btn(pyxel.KEY_RIGHT):
+        elif pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_RIGHT):
             if (self.x <= pyxel.width):
                 self.dx = MIKU_SPEED
         # 上下キーに動きを対応させる
-        if pyxel.btn(pyxel.KEY_UP):
+        if pyxel.btn(pyxel.KEY_UP) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_UP):
             if (self.y >= MIKU_SPEED):
                 self.dy = -MIKU_SPEED
-        elif pyxel.btn(pyxel.KEY_DOWN):
+        elif pyxel.btn(pyxel.KEY_DOWN) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_DOWN):
             if (self.y <= pyxel.height):
                 self.dy = MIKU_SPEED
         if(self.dx == 0 and self.dy == 0):
@@ -500,7 +500,7 @@ class MIKU(SATELLITE):
             super().update()
 
     def update_shari(self):
-        if pyxel.btnp(pyxel.KEY_SPACE):
+        if pyxel.btnp(pyxel.KEY_SPACE) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_A):
             SHARI(self.x + (PLAYER_WIDTH - BULLET_WIDTH) / 2, self.y - BULLET_HEIGHT / 2)
             pyxel.play(0, 4)
     def draw_circle(self): # 描画処理（自転のみ）
