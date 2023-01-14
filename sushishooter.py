@@ -138,7 +138,7 @@ class GameObjectManager:
 
 class App:
     def __init__(self): # 初期化
-        pyxel.init(300, 200, title="rotation", fps=10, display_scale=2, capture_scale=2, capture_sec=10)
+        pyxel.init(300, 200, title="SUSHI SHOOTER", fps=10, display_scale=2, capture_scale=2, capture_sec=10)
         self.init()
         self.kirakira_cnt = 0
         self.kirakira_x = 0
