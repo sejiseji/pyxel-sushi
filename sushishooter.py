@@ -28,7 +28,7 @@ SHOYU_BULLET_WIDTH  = 8
 SHOYU_BULLET_HEIGHT = 8
 SHOYU_BULLET_SPEED  = 4
 # 7つ寿司を揃えた時のキラキラ表示frame_count
-KIRAKIRA_CNT = 16
+KIRAKIRA_CNT = 24
 
 #-----------------------------------------------
 # >> オブジェクト種別毎の配列
@@ -392,7 +392,7 @@ class App:
 
         # 7種寿司を揃えたことの文字を表示し、キラキラ用ブラスト表示フレームカウントを減らす
         if(self.kirakira_cnt > 0):
-            pyxel.text(self.kirakira_x - 10, self.kirakira_y, "7-SUSHI GET!", pyxel.frame_count % 16)
+            pyxel.text(self.kirakira_x, self.kirakira_y + 10, "Yummy!!", pyxel.frame_count % 16)
             self.kirakira_cnt -= 1
 
         # 醤油弾
@@ -407,7 +407,7 @@ class App:
         # テキスト表示
         pyxel.text(100, 4, "SUSHI AWAITS ME TONIGHT !", pyxel.frame_count % 16)
 
-        pyxel.text(39, 4, f"SCORE {self.score_total:5}", 7)
+        pyxel.text(10, 4, f"SCORE {self.score_total:5}", 7)
 
                         
 
@@ -483,17 +483,17 @@ class MIKU(SATELLITE):
         self.dy = 0
         # 左右キーに動きを対応させる
         if pyxel.btn(pyxel.KEY_LEFT):
-            if (self.x >= MIKU_SPEED): # 画面端に達しているときは当該方向への増分をセットしない
+            if (self.x >  MIKU_SPEED): # 画面端に達しているときは当該方向への増分をセットしない
                 self.dx = -MIKU_SPEED
         elif pyxel.btn(pyxel.KEY_RIGHT):
-            if (self.x <= pyxel.width):
+            if (self.x <  pyxel.width - self.size):
                 self.dx = MIKU_SPEED
         # 上下キーに動きを対応させる
         if pyxel.btn(pyxel.KEY_UP):
-            if (self.y >= MIKU_SPEED):
+            if (self.y > MIKU_SPEED):
                 self.dy = -MIKU_SPEED
         elif pyxel.btn(pyxel.KEY_DOWN):
-            if (self.y <= pyxel.height):
+            if (self.y < pyxel.height - self.size):
                 self.dy = MIKU_SPEED
         if(self.dx == 0 and self.dy == 0):
             return # 動いていない
