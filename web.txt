@@ -1,1 +1,1 @@
-https://kitao.github.io/pyxel/wasm/launcher/?play=sejiseji.pyxel-sushishooter.sushishooter
+https://kitao.github.io/pyxel/wasm/launcher/?play=sejiseji.pyxel-sushishooter.sushishooter&gamepad=enabled
