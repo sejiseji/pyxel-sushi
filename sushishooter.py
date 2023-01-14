@@ -27,6 +27,8 @@ SHOYU_SPEED   = 5
 SHOYU_BULLET_WIDTH  = 8
 SHOYU_BULLET_HEIGHT = 8
 SHOYU_BULLET_SPEED  = 4
+# 7つ寿司を揃えた時のキラキラ表示frame_count
+KIRAKIRA_CNT = 16
 
 #-----------------------------------------------
 # >> オブジェクト種別毎の配列
@@ -138,6 +140,9 @@ class App:
     def __init__(self): # 初期化
         pyxel.init(300, 200, title="rotation", fps=10, display_scale=2, capture_scale=2, capture_sec=10)
         self.init()
+        self.kirakira_cnt = 0
+        self.kirakira_x = 0
+        self.kirakira_y = 0
         #BGM再生(MUSIC 0番をloop再生)
         pyxel.playm(0, loop = True)
         # アプリケーションの実行(更新関数、描画関数)
@@ -330,13 +335,19 @@ class App:
             if (not(self.sushiset_r[i].exists)):
                 self.satellite_all_flg = False
         
-        # 寿司衛星を全種揃えたことの加点、周回衛星全ての存在フラグを折る、ブラストを追加し、追加したブラストに光フラグを立てる
+        # 寿司衛星を全種揃えたことの加点、周回衛星全ての存在フラグを折る、
+        # 更にブラストを追加し、
+        # ブラストのキラキラ描画切替用のフラグをたてるとともに、キラキラ表示が有効な表示時間と位置を指定。
         if(self.satellite_all_flg):
             self.score_sushiall += 200
             for i in range(len(self.sushiset_r)):
                 self.sushiset_r[i].exists = False
                 blasts.append(Blast(self.sushiset_r[i].x + 16 / 2, self.sushiset_r[i].y + 16 / 2))
                 blasts[len(blasts)-1].kirakira = True
+                blasts[len(blasts)-1].kirakira_cnt = KIRAKIRA_CNT
+                self.kirakira_cnt = KIRAKIRA_CNT
+                self.kirakira_x = self.miku.x
+                self.kirakira_y = self.miku.y
                 pyxel.play(2, 6)
 
         # 合計得点の更新
@@ -347,7 +358,7 @@ class App:
         # 画面背景タイルマップを指定
         # pyxel.bltm(0, 0, 0,  0, 0, 300, 300) # 青海波
         # pyxel.bltm(0, 0, 0, 480, 256, 300, 300) # 昼間の町
-        pyxel.bltm(0, 0, 0, 512 + pyxel.frame_count % 300, 0, 300, 200) # 夕暮れの町
+        pyxel.bltm(0, 0, 0, 512 + pyxel.frame_count % 256, 0, 300, 200) # 夕暮れの町
 
         # frame_countの24スパン内で挙動を変えながら寿司を描画する
         if(pyxel.frame_count % 24 in range(8,17)):
@@ -364,10 +375,6 @@ class App:
         # mikuを動かす
         self.miku.draw_circle()
 
-        # 7種寿司を揃えた瞬間文字表示
-        if(self.satellite_all_flg):
-            pyxel.text(self.miku.x - 10, self.miku.y, "7-SUSHI GET!", pyxel.frame_count % 16)
-
         # mikuを周回する寿司衛星を描画する
         for i in range(len(self.sushiset_r)):
             if (self.sushiset_r[i].exists):
@@ -382,6 +389,12 @@ class App:
         draw_list(sushineta)
         # 着弾時衝撃波
         draw_list(blasts)
+
+        # 7種寿司を揃えたことの文字を表示し、キラキラ用ブラスト表示フレームカウントを減らす
+        if(self.kirakira_cnt > 0):
+            pyxel.text(self.kirakira_x - 10, self.kirakira_y, "7-SUSHI GET!", pyxel.frame_count % 16)
+            self.kirakira_cnt -= 1
+
         # 醤油弾
         draw_list(shoyu_bullets)
         # 敵醤油
@@ -392,7 +405,7 @@ class App:
             self.yukiset[i].draw_fall()
 
         # テキスト表示
-        pyxel.text(100, 5, "SUSHI AWAITS ME TONIGHT !", pyxel.frame_count % 16)
+        pyxel.text(100, 4, "SUSHI AWAITS ME TONIGHT !", pyxel.frame_count % 16)
 
         pyxel.text(39, 4, f"SCORE {self.score_total:5}", 7)
 
@@ -469,17 +482,17 @@ class MIKU(SATELLITE):
         self.dx = 0
         self.dy = 0
         # 左右キーに動きを対応させる
-        if pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_LEFT):
+        if pyxel.btn(pyxel.KEY_LEFT):
             if (self.x >= MIKU_SPEED): # 画面端に達しているときは当該方向への増分をセットしない
                 self.dx = -MIKU_SPEED
-        elif pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_RIGHT):
+        elif pyxel.btn(pyxel.KEY_RIGHT):
             if (self.x <= pyxel.width):
                 self.dx = MIKU_SPEED
         # 上下キーに動きを対応させる
-        if pyxel.btn(pyxel.KEY_UP) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_UP):
+        if pyxel.btn(pyxel.KEY_UP):
             if (self.y >= MIKU_SPEED):
                 self.dy = -MIKU_SPEED
-        elif pyxel.btn(pyxel.KEY_DOWN) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_DOWN):
+        elif pyxel.btn(pyxel.KEY_DOWN):
             if (self.y <= pyxel.height):
                 self.dy = MIKU_SPEED
         if(self.dx == 0 and self.dy == 0):
@@ -500,7 +513,7 @@ class MIKU(SATELLITE):
             super().update()
 
     def update_shari(self):
-        if pyxel.btnp(pyxel.KEY_SPACE) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_A):
+        if pyxel.btnp(pyxel.KEY_SPACE):
             SHARI(self.x + (PLAYER_WIDTH - BULLET_WIDTH) / 2, self.y - BULLET_HEIGHT / 2)
             pyxel.play(0, 4)
     def draw_circle(self): # 描画処理（自転のみ）
@@ -671,16 +684,22 @@ class Blast: # 着弾時の衝撃波
         self.radius = BLAST_START_RADIUS
         self.is_alive = True
         self.kirakira = False
+        self.kirakira_cnt = 0
         blasts.append(self)
 
     def update(self):
-        self.radius += 1
-        if self.radius > BLAST_END_RADIUS:
-            self.is_alive = False
+        if(self.kirakira):
+            if(self.kirakira_cnt == 0):
+                self.is_alive = False
+        else:
+            self.radius += 1
+            if self.radius > BLAST_END_RADIUS:
+                self.is_alive = False
 
     def draw(self):
-        if(self.kirakira):
-            pyxel.blt(self.x, self.y, 0, 112, 32, 16, 16, 11)
+        if(self.kirakira and self.kirakira_cnt > 0):
+            pyxel.blt(self.x, self.y, 0, 112, 32 + 16*(pyxel.frame_count % 4), 16, 16, 11)
+            self.kirakira_cnt -= 1
         else:
             pyxel.circ(self.x, self.y, self.radius, BLAST_COLOR_IN)
             pyxel.circb(self.x, self.y, self.radius, BLAST_COLOR_OUT)
