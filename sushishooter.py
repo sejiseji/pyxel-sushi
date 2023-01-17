@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import pyxel
 import math
+import webbrowser
 
 #-----------------------------------------------
 # GAME状態
@@ -293,12 +294,21 @@ class App:
                     self.game_mode = INVINCIBLE_MODE
                     self.selectdelay_cnt = 3
 
+    def post_tweet(self):
+        template_link = "https://twitter.com/intent/tweet?text=%0A-----------------------------%0A%E7%A7%81%E3%81%AE%E3%83%8F%E3%82%A4%E3%82%B9%E3%82%B3%E3%82%A2%E3%81%AF{}%E3%81%A7%E3%81%99%EF%BC%81%0A%3E%3ESUSHI%20SHOOTER%3C%3C%0Ahttps%3A%2F%2Fkitao.github.io%2Fpyxel%2Fwasm%2Flauncher%2F%3Fplay%3Dsejiseji.pyxel-sushi.sushishooter%26gamepad%3Denabled%0A%23Pyxel"
+        result_score = self.hi_score
+        form_link = template_link.format(result_score)
+        webbrowser.open(form_link)
+
+
     def update_title_scene(self):
         self.update_gamemode()
         if(self.game_mode in (INVINCIBLE_MODE, NORMAL_MODE, HARD_MODE)):
             if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_X):
                 self.game_start()
-
+        if(self.game_mode == POST_TWEET_MODE):
+            if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_X):
+                self.post_tweet()
 
     def update_play_scene(self):
         # キー操作に対応させる
@@ -357,22 +367,22 @@ class App:
         # frame_count 指定値毎に1匹生成。
         if pyxel.frame_count % 10 == 0:
             self.addspeed = 1 if self.game_mode == HARD_MODE else 0
-            NETA(300, pyxel.rndi(0, pyxel.height - ENEMY_HEIGHT), pyxel.rndi(0, 6), self.addspeed) 
+            NETA(pyxel.width, pyxel.rndi(0, pyxel.height - ENEMY_HEIGHT), pyxel.rndi(0, 6), self.addspeed) 
         
         # 敵の醤油を生成 : X座標、Y座標
         # frame_count 指定値毎に1匹生成。
         if pyxel.frame_count % 20 == 0:
             self.addspeed = 2 if self.game_mode == HARD_MODE else 0
-            SHOYU(300, pyxel.rndi(0, pyxel.height - SHOYU_HEIGHT), self.addspeed) 
+            SHOYU(pyxel.width, pyxel.rndi(0, pyxel.height - SHOYU_HEIGHT), self.addspeed) 
 
         # アイテムを生成 : X座標、Y座標、パターン指定（0:ハート）
         # frame_count 指定値毎に生成。
         if(self.game_mode == NORMAL_MODE):
             if pyxel.frame_count % 250 == 0:
-                ITEM(300, pyxel.rndi(0, pyxel.height - ITEM_HEIGHT), 0, 0) 
+                ITEM(pyxel.width, pyxel.rndi(0, pyxel.height - ITEM_HEIGHT), 0, 0) 
         if(self.game_mode == HARD_MODE):
             if pyxel.frame_count % 200 == 0:
-                ITEM(300, pyxel.rndi(0, pyxel.height - ITEM_HEIGHT), 0, 1) 
+                ITEM(pyxel.width, pyxel.rndi(0, pyxel.height - ITEM_HEIGHT), 0, 1) 
 
         # アイテムとmikuの当たり判定
         for item in items:
@@ -570,6 +580,10 @@ class App:
         if(self.game_mode in (INVINCIBLE_MODE, NORMAL_MODE, HARD_MODE)):
             if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_X):
                 self.game_start()
+        
+        if(self.game_mode == POST_TWEET_MODE):
+            if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_X):
+                self.post_tweet()
 
     def game_start(self):
         self.scene = SCENE_PLAY
@@ -605,7 +619,7 @@ class App:
 
     def draw(self): # 描画処理
         # 画面背景タイルマップを指定
-        pyxel.bltm(0, 0, 0, 512 + pyxel.frame_count % 256, 0, 300, 200) # 夕暮れの町
+        pyxel.bltm(0, 0, 0, 512 + pyxel.frame_count % 256, 0, pyxel.width, pyxel.height) # 夕暮れの町
         # frame_countの24スパン内で挙動を変えながら寿司を描画する
         if(pyxel.frame_count % 24 in range(8,17)):
             for i in range(len(self.sushiset_f)):
@@ -633,13 +647,6 @@ class App:
         pyxel.blt(82, 3, 1, 32, 128, 8, 8, 0) if (self.miku.hp >= 3) else pyxel.blt(82, 3, 1, 32, 136, 8, 8, 0)
         # text
         pyxel.text(100, 4, "SUSHI AWAITS ME TONIGHT !", pyxel.frame_count % 16)
-
-    def draw_title_scene(self):
-        pyxel.text(125, 50, "Sushi Shooter", pyxel.frame_count % 16)
-        pyxel.text(121, 66, "- PRESS ENTER -", 11)
-        self.draw_key_list()
-        self.draw_gamemode()
-        self.draw_howtoplay()
 
     def draw_key_list(self):
         # 操作方法の画面表示
@@ -709,6 +716,13 @@ class App:
         pyxel.text(133, 163, "POST_TWEET", self.mode4_color)
         pyxel.rectb(4, 159, 173, 13, self.text_color_base)
 
+    def draw_title_scene(self):
+        pyxel.text(125, 50, "Sushi Shooter", pyxel.frame_count % 16)
+        pyxel.text(121, 66, "- PRESS ENTER -", 11)
+        self.draw_key_list()
+        self.draw_gamemode()
+        self.draw_howtoplay()
+
     def draw_play_scene(self):
         # mikuを動かす
         self.miku.draw_circle()
@@ -742,8 +756,6 @@ class App:
         if(self.game_mode == INVINCIBLE_MODE) :
                 pyxel.text(50, 18, "- NOW ON INVINCIBLE MODE, PRESS Enter TO TITLE -", 7)
 
-
-
     def draw_gameover_scene(self):
         # HI-SCORE の更新
         if(self.score_total > self.hi_score):
@@ -762,6 +774,7 @@ class App:
         self.draw_key_list()
         self.draw_gamemode()
         self.draw_score_list()
+
 
 class SATELLITE(GameObject):
     def __init__(self, base_x, base_y, radius, sat_num, order, center_adjust):
