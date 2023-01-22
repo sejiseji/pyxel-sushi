@@ -2,6 +2,7 @@
 import pyxel
 import math
 import webbrowser
+from pyquaternion import Quaternion
 
 #-----------------------------------------------
 # GAME状態
@@ -13,11 +14,23 @@ NORMAL_MODE = 2
 HARD_MODE = 3
 POST_TWEET_MODE = 4
 TEXT_COLOR = 7
-
 # 星
 NUM_STARS = 100
 STAR_COLOR_HIGH = 11
 STAR_COLOR_LOW = 3
+# 寿司衛星の周回半径
+SATELLITE_RADIUS = 20
+# 寿司衛星の3D回転
+FLG_SATELITE_3D_ROTATE = True
+# 寿司衛星の3D回転時の軸設定
+## 回転更新に用いる回転軸
+AXIS_3D_X = -1
+AXIS_3D_Y = 1
+AXIS_3D_Z = -1
+## 初期位置の平面→3次元平面への座標セットに用いる回転軸
+AXIS_3D_X_INIT = -1
+AXIS_3D_Y_INIT = 1
+AXIS_3D_Z_INIT = -1
 # miku
 MIKU_WIDTH  = 16
 MIKU_SPEED = 5
@@ -197,6 +210,7 @@ class GameObjectManager:
 				obj.draw()
 
 
+
 class App:
     def __init__(self): # 初期化
         pyxel.init(300, 200, title="SUSHI SHOOTER", fps=10, display_scale=2, capture_scale=2, capture_sec=10)
@@ -236,16 +250,16 @@ class App:
         if(self.game_mode == HARD_MODE):
             self.miku.addspeed = 2
         # Mikuを周回するSushi衛星を準備。回転の中心点は正方形Miku画像の1辺サイズの半分を基準点とする。
-        # 引数：寿司ネタ種別, 回転の基準点X, 回転の基準点Y, 衛星振舞い（回転）フラグ、基準点からの距離, 編隊数, 編隊内の順序
+        # 引数：寿司ネタ種別, 回転の基準点X, 回転の基準点Y, 衛星振舞い（回転）フラグ、基準点からの距離, 編隊数, 編隊内の順序, 3d回転フラグ
         # 寿司ネタ種別 0:まぐろ 1:はまち 2:たまご 3:とろ軍艦 4:サーモン 5:えび 6:さんま
         self.sushiset_r = []
         for i in range(7):
-            self.sushiset_r.append(SUSHI(i, self.miku.x, self.miku.y, True, 10, 7, (i + 1), self.miku.size/2))
+            self.sushiset_r.append(SUSHI(i, self.miku.x, self.miku.y, True, SATELLITE_RADIUS, 7, (i + 1), self.miku.size/2, FLG_SATELITE_3D_ROTATE))
 
         # 横に流れるだけの寿司を準備 
         self.sushiset_f = []
         for i in range(7):
-            self.sushiset_f.append(SUSHI((6 - i), 17 * i, 183, False, 0, 0, 0, 0))
+            self.sushiset_f.append(SUSHI((6 - i), 17 * i, 183, False, 0, 0, 0, 0, False))
 
         # 雪を準備 
         self.snow_all_amount = 50
@@ -724,12 +738,22 @@ class App:
         self.draw_howtoplay()
 
     def draw_play_scene(self):
-        # mikuを動かす
-        self.miku.draw_circle()
 
-        # mikuを周回する寿司衛星を描画する
+        # mikuを周回する寿司衛星を描画する（描画階層index = -1）
         for i in range(len(self.sushiset_r)):
-            if (self.sushiset_r[i].exists):
+            if (self.sushiset_r[i].exists and self.sushiset_r[i].draw_index == -1):
+                self.sushiset_r[i].draw_circle()
+
+        # mikuを描画する（描画階層index = 0）
+        self.miku.draw_circle()
+        # mikuを周回する寿司衛星を描画する（描画階層index = 0）
+        for i in range(len(self.sushiset_r)):
+            if (self.sushiset_r[i].exists and self.sushiset_r[i].draw_index == 0):
+                self.sushiset_r[i].draw_circle()
+
+        # mikuを周回する寿司衛星を描画する（描画階層index = 1）
+        for i in range(len(self.sushiset_r)):
+            if (self.sushiset_r[i].exists and self.sushiset_r[i].draw_index == 1):
                 self.sushiset_r[i].draw_circle()
 
         # mikuの周回後座標の計算、自位置座標を更新
@@ -777,19 +801,37 @@ class App:
 
 
 class SATELLITE(GameObject):
-    def __init__(self, base_x, base_y, radius, sat_num, order, center_adjust):
+    def __init__(self, base_x, base_y, radius, sat_num, order, center_adjust, flg_3d):
         super().__init__()
         self.radius = radius # 周回半径
         self.ddeg = 16 # 周回時偏角固定
         self.drad = math.radians(self.ddeg)
-        # 初期位置
-        self.initposition(base_x, base_y, radius, sat_num, order, center_adjust)
+        # 3次元回転での回転計算をする際に用いるz軸の仮値
+        self.z = 0
+        # 描画時の順序。3d回転を行わない平常時は0
+        self.draw_index = 0
+        # 3次元回転フラグ
+        self.flg_3d = flg_3d
+        if(self.flg_3d):
+            # 3D回転でどんな軸周りに何ラジアン回転するか規定したQuaternionを生成。
+            self.quat = Quaternion(
+                axis  = [AXIS_3D_X, AXIS_3D_Y, AXIS_3D_Z], # 回転に使用するxyz3軸を設定。
+                angle = math.pi * 0.1 # 回転角度を設定しラジアン値を用いる。
+            )
+            # 初期配置用
+            self.quat_init = Quaternion(
+                axis  = [AXIS_3D_X_INIT, AXIS_3D_Y_INIT, AXIS_3D_Z_INIT], # 回転に使用するxyz3軸を設定。
+                angle = math.pi * pyxel.rndf(0.04, 0.08) # 回転角度を設定しラジアン値を用いる。
+            )
         # 回転基準位置
         self.BASE_X = base_x
         self.BASE_Y = base_y
-        # 回転後位置（一旦、初期位置）
+        # 初期位置は必ず2次元座標上での回転計算を用いてXY平面上に展開する
+        self.initposition(base_x, base_y, radius, sat_num, order, center_adjust)
+        # 回転後位置の初期化（一旦、初期位置）
         self.rotated_X = self.x
         self.rotated_Y = self.y
+        self.rotated_Z = self.z
     def initposition(self, base_x, base_y, radius, sat_num, order, center_adjust):
         # ≫回転の基準となるx,y座標パラメタとそこからの距離radius,予定編隊衛星数sat_num,
         #   そのうちの何番目かorderを受け取って衛星1個自身の初期位置を決める。
@@ -804,17 +846,28 @@ class SATELLITE(GameObject):
         # 実部虚部を取り出して衛星のXY座標とする
         self.x = self.rotated.real
         self.y = self.rotated.imag
+
+        if(self.flg_3d):
+            self.init_quaternion_rotate()
+
     def update(self): # フレームの更新処理
         # 回転先の座標を計算して位置情報を更新
         self.rotate()
         self.x = self.rotated_X
         self.y = self.rotated_Y
+        self.z = self.rotated_Z
     def baseupdate(self, base_x, base_y): 
         # 回転の基準点を引数の値に更新
         self.BASE_X = base_x
         self.BASE_Y = base_y   
     def rotate(self):
-        # 周回後の位置を決定する
+        # 周回後の位置を決定する.
+        # 3次元回転をするか否かのフラグ状態で挙動を切り替え。
+        if(self.flg_3d):
+            self.quaternion_rotate()
+        else:
+            self.complex_rotate()
+    def complex_rotate(self):
         # # 複素平面上の実部・虚部の関係性に置き換えて回転角dradで回転後の座標を計算する
         # # 回転前の座標に対応する極座標
         #   （衛星が周回する中心点から半径radiusだけX軸方向に進んだ座標）
@@ -826,7 +879,22 @@ class SATELLITE(GameObject):
         # 複素平面の実部・虚部が回転後の直交座標に対応
         self.rotated_X = self.rotated.real # 実部係数
         self.rotated_Y = self.rotated.imag # 虚部係数
-
+    def quaternion_rotate(self):
+        # 3次元回転の計算と描画順序層の更新。
+        # 回転後のx,yを取得
+        [self.rotated_X, self.rotated_Y, self.rotated_Z] = self.quat.rotate([self.x - self.BASE_X, self.y - self.BASE_Y, self.z])
+        self.rotated_X += self.BASE_X
+        self.rotated_Y += self.BASE_Y
+        # zは圧縮して描画順序の更新に利用する.
+        self.draw_index = 1 if self.z > 0 else -1
+    def init_quaternion_rotate(self):
+        # 3次元回転の計算と描画順序層の更新。
+        # 回転後のx,yを取得
+        [self.rotated_X, self.rotated_Y, self.rotated_Z] = self.quat_init.rotate([self.x, self.y - self.BASE_Y, self.z])
+        self.rotated_X += self.BASE_X
+        self.rotated_Y += self.BASE_Y
+        # zは圧縮して描画順序の更新に利用する.
+        self.draw_index = 1 if self.rotated_Z > 0 else -1
 
 class MIKU(SATELLITE):
     # 初期化
@@ -847,6 +915,7 @@ class MIKU(SATELLITE):
         self.hp = MIKU_HP
         self.after_damage_frame = 0
         self.addspeed = 0
+        
     def update_btn(self):
         self.dx = 0
         self.dy = 0
@@ -904,12 +973,12 @@ class MIKU(SATELLITE):
 
 class SUSHI(SATELLITE):
     # 初期化
-    def __init__(self, neta, base_x, base_y, flg_rot, radius, sat_num, order, center_adjust):
+    def __init__(self, neta, base_x, base_y, flg_rot, radius, sat_num, order, center_adjust, flg_3d):
         self.FLG_ROT = flg_rot
         # 回転フラグがTrueの場合衛星としての振舞いを有効にする。
         # そうでない場合は引数座標を初期位置座標として用いる。
         if (self.FLG_ROT):
-            super().__init__(base_x, base_y, radius, sat_num, order, center_adjust)
+            super().__init__(base_x, base_y, radius, sat_num, order, center_adjust, flg_3d)
         else:
             self.x = base_x
             self.y = base_y
