@@ -48,6 +48,8 @@ ENEMY_SPEED   = 3
 BULLET_WIDTH  = 8
 BULLET_HEIGHT = 8
 BULLET_SPEED  = 4
+# レーザー弾
+LASER_SPEED  = 8
 # 着弾時衝撃
 BLAST_START_RADIUS = 1
 BLAST_END_RADIUS   = 8
@@ -75,6 +77,8 @@ SCORE_6 = 35
 SCORE_SUSHIALL = 200
 SCORE_HEART = 100
 SCORE_SHOYU = 40
+# 加速アイテムを取得した際の有効時間（frame数）
+ACCELERATED_TIME = 100
 
 #-----------------------------------------------
 # >> オブジェクト種別毎の配列
@@ -90,6 +94,11 @@ blasts = []
 shoyu = []
 # 醬油弾
 shoyu_bullets = []
+# レーザー弾
+lasers = []
+#-----------------------------------------------
+# homing用の最も近い座標
+nearest_x, nearest_y = 0, 0
 #-----------------------------------------------
 
 
@@ -109,7 +118,6 @@ def cleanup_list(list):
             list.pop(i)
         else:
             i += 1
-
 
 class Background:
     def __init__(self):
@@ -210,7 +218,6 @@ class GameObjectManager:
 				obj.draw()
 
 
-
 class App:
     def __init__(self): # 初期化
         pyxel.init(300, 200, title="SUSHI SHOOTER", fps=10, display_scale=2, capture_scale=2, capture_sec=10)
@@ -243,12 +250,16 @@ class App:
         self.hiscore_updt_flg = False
         self.game_mode = INVINCIBLE_MODE # 起動時点では無敵（無限モード）
         self.selectdelay_cnt = 0
+        self.accelerated_time = 0
 
         # Mikuを準備
-        # Miku自身SATELLITEを継承し回転の基準点を画面中央、衛星振舞い（回転）フラグ、周回時半径,編隊数1,隊内order1として単体で回転を行う。
-        self.miku = MIKU(100, 100, False, 16, 1, 1, 0)
+        # Miku自身SATELLITEを継承。
+        # 回転の基準点を画面中央、衛星振舞い（回転）フラグ、周回時半径,編隊数1,隊内order1, 衛星としての初期位置調整値を指定し、単体で回転を行う。
+        # 最後の値は加速状態時の追加速度。
+        self.miku = MIKU(100, 100, False, 16, 1, 1, 0, 2)
         if(self.game_mode == HARD_MODE):
             self.miku.addspeed = 2
+        
         # Mikuを周回するSushi衛星を準備。回転の中心点は正方形Miku画像の1辺サイズの半分を基準点とする。
         # 引数：寿司ネタ種別, 回転の基準点X, 回転の基準点Y, 衛星振舞い（回転）フラグ、基準点からの距離, 編隊数, 編隊内の順序, 3d回転フラグ
         # 寿司ネタ種別 0:まぐろ 1:はまち 2:たまご 3:とろ軍艦 4:サーモン 5:えび 6:さんま
@@ -271,7 +282,7 @@ class App:
 
 
     def update(self): # 更新処理
-        if pyxel.btn(pyxel.KEY_Q) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_Y):
+        if pyxel.btn(pyxel.KEY_Q):
             pyxel.quit()
 
         self.background.update()
@@ -325,10 +336,12 @@ class App:
                 self.post_tweet()
 
     def update_play_scene(self):
-        # キー操作に対応させる
-        self.miku.update_shari() # シャリの射出
         
+        self.miku.update_recordxy() # 現在位置の記録
+        self.miku.update_shari() # シャリの射出
+        self.miku.update_laser() # レーザーの射出
         self.miku.update_btn() # 上下左右キーで位置座標の増減分dx,dyを取得
+        self.update_accelerated() # 加速状態の残り時間を更新する
 
         update_list(items) # アイテムの状態を更新
         cleanup_list(items)
@@ -341,6 +354,9 @@ class App:
 
         update_list(shoyu_bullets) # 醤油弾の状態を更新
         cleanup_list(shoyu_bullets)
+
+        update_list(lasers) # レーザー弾の状態を更新
+        cleanup_list(lasers)
 
         for enemy in shoyu:
             enemy.update_shoyu_bullet() # 醤油弾の射出
@@ -389,14 +405,21 @@ class App:
             self.addspeed = 2 if self.game_mode == HARD_MODE else 0
             SHOYU(pyxel.width, pyxel.rndi(0, pyxel.height - SHOYU_HEIGHT), self.addspeed) 
 
-        # アイテムを生成 : X座標、Y座標、パターン指定（0:ハート）
+        # アイテムを生成 : X座標、Y座標、パターン指定（0:ハート 1:加速アイテム）、調整スピード
         # frame_count 指定値毎に生成。
-        if(self.game_mode == NORMAL_MODE):
+        # game_modeで生成頻度を変える。
+        if(self.game_mode in (NORMAL_MODE, INVINCIBLE_MODE)):
+            # ハートの生成
             if pyxel.frame_count % 250 == 0:
                 ITEM(pyxel.width, pyxel.rndi(0, pyxel.height - ITEM_HEIGHT), 0, 0) 
+            # 加速アイテムの生成
+            if pyxel.frame_count % 400 == 0:
+                ITEM(pyxel.width, pyxel.rndi(0, pyxel.height - ITEM_HEIGHT), 1, 0) 
         if(self.game_mode == HARD_MODE):
             if pyxel.frame_count % 200 == 0:
                 ITEM(pyxel.width, pyxel.rndi(0, pyxel.height - ITEM_HEIGHT), 0, 1) 
+            if pyxel.frame_count % 350 == 0:
+                ITEM(pyxel.width, pyxel.rndi(0, pyxel.height - ITEM_HEIGHT), 1, 1) 
 
         # アイテムとmikuの当たり判定
         for item in items:
@@ -422,6 +445,10 @@ class App:
                     self.score_heart += SCORE_HEART
                     if(self.miku.hp <= 2):
                         self.miku.hp += 1
+                if(item.pattern == 1): # 加速アイテム
+                    pyxel.play(1, 7)
+                    self.miku.accelerated = True
+                    self.accelerated_time = ACCELERATED_TIME # 規定frameだけ有効にするため、値をセットする
 
         # 寿司ネタとシャリの当たり判定
         for enemy in sushineta:
@@ -480,6 +507,76 @@ class App:
         # 醤油（弾）とシャリの当たり判定
         for enemy in shoyu_bullets:
             for bullet in shari_bullets:
+                if (
+                    enemy.y + enemy.h > bullet.y
+                    and bullet.y + bullet.h > enemy.y
+                    and enemy.x + enemy.w > bullet.x
+                    and bullet.x + bullet.w > enemy.x
+                ):
+                    enemy.is_alive = False
+                    bullet.is_alive = False
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
+                    )
+                    pyxel.play(1, 9)
+
+        # 寿司ネタとシャリの当たり判定
+        for enemy in sushineta:
+            for bullet in lasers:
+                if (
+                    enemy.y + enemy.h > bullet.y
+                    and bullet.y + bullet.h > enemy.y
+                    and enemy.x + enemy.w > bullet.x
+                    and bullet.x + bullet.w > enemy.x
+                ):
+                    enemy.is_alive = False
+                    bullet.is_alive = False
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
+                    )
+                    pyxel.play(1, 5)
+                    if(enemy.pattern == 0):
+                        self.sushiset_r[0].exists = True
+                        self.score_0 += SCORE_0
+                    if(enemy.pattern == 1):
+                        self.sushiset_r[1].exists = True
+                        self.score_1 += SCORE_1
+                    if(enemy.pattern == 2):
+                        self.sushiset_r[2].exists = True
+                        self.score_2 += SCORE_2
+                    if(enemy.pattern == 3):
+                        self.sushiset_r[3].exists = True
+                        self.score_3 += SCORE_3
+                    if(enemy.pattern == 4):
+                        self.sushiset_r[4].exists = True
+                        self.score_4 += SCORE_4
+                    if(enemy.pattern == 5):
+                        self.sushiset_r[5].exists = True
+                        self.score_5 += SCORE_5
+                    if(enemy.pattern == 6):
+                        self.sushiset_r[6].exists = True
+                        self.score_6 += SCORE_6
+
+        # 醤油（魚）とシャリの当たり判定
+        for enemy in shoyu:
+            for bullet in lasers:
+                if (
+                    enemy.y + enemy.h > bullet.y
+                    and bullet.y + bullet.h > enemy.y
+                    and enemy.x + enemy.w > bullet.x
+                    and bullet.x + bullet.w > enemy.x
+                ):
+                    enemy.is_alive = False
+                    bullet.is_alive = False
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
+                    )
+                    pyxel.play(1, 5)
+                    self.score_shoyu += SCORE_SHOYU
+
+        # 醤油（弾）とレーザーの当たり判定
+        for enemy in shoyu_bullets:
+            for bullet in lasers:
                 if (
                     enemy.y + enemy.h > bullet.y
                     and bullet.y + bullet.h > enemy.y
@@ -576,6 +673,14 @@ class App:
                            self.score_4 + self.score_5 + self.score_6 + self.score_heart + \
                            self.score_sushiall + self.score_shoyu
 
+    def update_accelerated(self):
+        # 加速中時間が有効であれば、残りtimeを減らす
+        if(self.accelerated_time > 0):
+            self.accelerated_time -= 1
+            # 残り時間が0になったらmikuの加速状態を解除する
+            if(self.accelerated_time == 0):
+                self.miku.accelerated = False
+
     def update_gameover_scene(self):
         self.update_gamemode()
         update_list(items)
@@ -584,12 +689,14 @@ class App:
         update_list(blasts)
         update_list(shoyu)
         update_list(shoyu_bullets)
+        update_list(lasers)
         cleanup_list(items)
         cleanup_list(sushineta)
         cleanup_list(shari_bullets)
         cleanup_list(blasts)
         cleanup_list(shoyu)
         cleanup_list(shoyu_bullets)
+        cleanup_list(lasers)
 
         if(self.game_mode in (INVINCIBLE_MODE, NORMAL_MODE, HARD_MODE)):
             if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_X):
@@ -633,14 +740,15 @@ class App:
 
     def draw(self): # 描画処理
         # 画面背景タイルマップを指定
-        pyxel.bltm(0, 0, 0, 512 + pyxel.frame_count % 256, 0, pyxel.width, pyxel.height) # 夕暮れの町
-        # frame_countの24スパン内で挙動を変えながら寿司を描画する
-        if(pyxel.frame_count % 24 in range(8,17)):
-            for i in range(len(self.sushiset_f)):
-                self.sushiset_f[i].draw_jump()
-        else:
-            for i in range(len(self.sushiset_f)):
-                self.sushiset_f[i].draw_flow()
+        # pyxel.bltm(0, 0, 0, 705 + pyxel.frame_count % 256, 0, pyxel.width, pyxel.height) # 夕暮れの町
+        pyxel.bltm(0, 0, 0, 0   + pyxel.frame_count % 256, 0, pyxel.width, pyxel.height) # 青海波
+
+        # 波を挿入
+        # self.drawdx = math.ceil(3*math.sin(pyxel.frame_count % (360 / 5)))
+        # self.drawdy = math.ceil(5*math.cos(pyxel.frame_count % 360))
+        # pyxel.blt(-8 - self.drawdx, 120 - self.drawdy, \
+        #           0, 0, 144, 176, 112, 0)
+
         # シーン別の描画
         self.background.draw()
         if self.scene == SCENE_TITLE:
@@ -653,14 +761,14 @@ class App:
         for i in range(self.snow_all_amount):
             self.yukiset[i].draw_fall()        
         # スコア表示
-        pyxel.text(10, 4, f"SCORE {self.score_total:5}", 7)
-        pyxel.text(230, 4, f"HI-SCORE {self.hi_score:5}", 7)
+        pyxel.text(10, 2, f"SCORE {self.score_total:5}", 7)
+        pyxel.text(230, 2, f"HI-SCORE {self.hi_score:5}", 7)
         # 体力表示
-        pyxel.blt(66, 3, 1, 32, 128, 8, 8, 0) if (self.miku.hp >= 1) else pyxel.blt(66, 3, 1, 32, 136, 8, 8, 0)
-        pyxel.blt(74, 3, 1, 32, 128, 8, 8, 0) if (self.miku.hp >= 2) else pyxel.blt(74, 3, 1, 32, 136, 8, 8, 0)
-        pyxel.blt(82, 3, 1, 32, 128, 8, 8, 0) if (self.miku.hp >= 3) else pyxel.blt(82, 3, 1, 32, 136, 8, 8, 0)
+        pyxel.blt(10, 8, 1, 32, 128, 8, 8, 0) if (self.miku.hp >= 1) else pyxel.blt(10, 8, 1, 32, 136, 8, 8, 0)
+        pyxel.blt(18, 8, 1, 32, 128, 8, 8, 0) if (self.miku.hp >= 2) else pyxel.blt(18, 8, 1, 32, 136, 8, 8, 0)
+        pyxel.blt(26, 8, 1, 32, 128, 8, 8, 0) if (self.miku.hp >= 3) else pyxel.blt(26, 8, 1, 32, 136, 8, 8, 0)
         # text
-        pyxel.text(100, 4, "SUSHI AWAITS ME TONIGHT !", pyxel.frame_count % 16)
+        pyxel.text(100, 2, "SUSHI AWAITS ME TONIGHT !", pyxel.frame_count % 16)
 
     def draw_key_list(self):
         # 操作方法の画面表示
@@ -672,7 +780,7 @@ class App:
         pyxel.text(9, 114, "MOVE UP    : PRESS UP    / GAME PAD UP", self.text_color)
         pyxel.text(9, 122, "MOVE DOWN  : PRESS DOWN  / GAME PAD DOWN", self.text_color)
         pyxel.text(9, 130, "GAME START : PRESS ENTER / GAME PAD X", self.text_color)
-        pyxel.text(9, 138, "GAME END   : PRESS Q     / GAME PAD Y", self.text_color)
+        pyxel.text(9, 138, "GAME END   : PRESS Q     / CLOSE BROWSER", self.text_color)
         pyxel.rectb(4, 85, 173, 63, self.text_color)
 
     def draw_score_list(self):
@@ -709,7 +817,7 @@ class App:
 
     def draw_gamemode(self):
         self.text_color_base = TEXT_COLOR
-        self.text_color_selected = 8
+        self.text_color_selected = 10
         # gamemodeに応じたcolorセット
         if (self.game_mode == INVINCIBLE_MODE): 
             self.mode1_color, self.mode2_color, self.mode3_color, self.mode4_color = \
@@ -736,6 +844,13 @@ class App:
         self.draw_key_list()
         self.draw_gamemode()
         self.draw_howtoplay()
+        # frame_countの24スパン内で挙動を変えながら寿司を描画する
+        if(pyxel.frame_count % 24 in range(8,17)):
+            for i in range(len(self.sushiset_f)):
+                self.sushiset_f[i].draw_jump()
+        else:
+            for i in range(len(self.sushiset_f)):
+                self.sushiset_f[i].draw_flow()
 
     def draw_play_scene(self):
 
@@ -771,6 +886,8 @@ class App:
         draw_list(shoyu_bullets)
         # 敵醤油
         draw_list(shoyu)
+        # レーザー
+        draw_list(lasers)
 
         # 7種寿司を揃えたことの文字を表示し、キラキラ用ブラスト表示フレームカウントを減らす
         if(self.kirakira_cnt > 0):
@@ -778,7 +895,7 @@ class App:
             self.kirakira_cnt -= 1
         # 無敵モードの終了案内
         if(self.game_mode == INVINCIBLE_MODE) :
-                pyxel.text(50, 18, "- NOW ON INVINCIBLE MODE, PRESS Enter TO TITLE -", 7)
+                pyxel.text(50, 17, "- NOW ON INVINCIBLE MODE, PRESS Enter TO TITLE -", 7)
 
     def draw_gameover_scene(self):
         # HI-SCORE の更新
@@ -791,6 +908,7 @@ class App:
         draw_list(blasts)
         draw_list(shoyu_bullets)
         draw_list(shoyu)
+        draw_list(lasers)
         if(self.hiscore_updt_flg):
             pyxel.text(81, 58, "Congratulation!! HI-SCORE updated!!", pyxel.frame_count % 16)
         pyxel.text(133, 50, "GAME OVER", 8)
@@ -798,7 +916,13 @@ class App:
         self.draw_key_list()
         self.draw_gamemode()
         self.draw_score_list()
-
+        # frame_countの24スパン内で挙動を変えながら寿司を描画する
+        if(pyxel.frame_count % 24 in range(8,17)):
+            for i in range(len(self.sushiset_f)):
+                self.sushiset_f[i].draw_jump()
+        else:
+            for i in range(len(self.sushiset_f)):
+                self.sushiset_f[i].draw_flow()
 
 class SATELLITE(GameObject):
     def __init__(self, base_x, base_y, radius, sat_num, order, center_adjust, flg_3d):
@@ -898,7 +1022,7 @@ class SATELLITE(GameObject):
 
 class MIKU(SATELLITE):
     # 初期化
-    def __init__(self, base_x, base_y, flg_rot, radius, sat_num, order, center_adjust):
+    def __init__(self, base_x, base_y, flg_rot, radius, sat_num, order, center_adjust, accelerated_speed):
         self.FLG_ROT = flg_rot
         # 回転フラグがTrueの場合衛星としての振舞いを有効にする。
         # そうでない場合は引数座標を初期位置座標として用いる。
@@ -915,24 +1039,35 @@ class MIKU(SATELLITE):
         self.hp = MIKU_HP
         self.after_damage_frame = 0
         self.addspeed = 0
+        self.accelerated_speed = accelerated_speed
+        self.accelerated = False
+        # 軌跡描画用の座標記録配列
+        self.trajectory_point = []
+        self.trajectory_point.append([self.x, self.y])
         
     def update_btn(self):
+        # 増分を初期化
         self.dx = 0
         self.dy = 0
+        # 加速状態にあれば規定の追加速度を加味する
+        if (self.accelerated):
+            speed = MIKU_SPEED + self.accelerated_speed
+        else:
+            speed = MIKU_SPEED
         # 左右キーに動きを対応させる
         if pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_LEFT):
-            if (self.x >  MIKU_SPEED): # 画面端に達しているときは当該方向への増分をセットしない
-                self.dx = -MIKU_SPEED
+            if (self.x >  speed): # 画面端に達しているときは当該方向への増分をセットしない
+                self.dx = -speed
         elif pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_RIGHT):
             if (self.x <  pyxel.width - self.size):
-                self.dx = MIKU_SPEED
+                self.dx = speed
         # 上下キーに動きを対応させる
         if pyxel.btn(pyxel.KEY_UP) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_UP):
-            if (self.y > MIKU_SPEED):
-                self.dy = -MIKU_SPEED
+            if (self.y > speed):
+                self.dy = -speed
         elif pyxel.btn(pyxel.KEY_DOWN) or pyxel.btn(pyxel.GAMEPAD1_BUTTON_DPAD_DOWN):
             if (self.y < pyxel.height - self.size):
-                self.dy = MIKU_SPEED
+                self.dy = speed
         if(self.dx == 0 and self.dy == 0):
             return # 動いていない
         # 移動範囲を制限
@@ -941,10 +1076,17 @@ class MIKU(SATELLITE):
         self.y = max(self.y, 0)
         self.y = min(self.y, pyxel.height - self.size)
 
+    def update_recordxy(self):
+        # 軌跡の記録
+        if (len(self.trajectory_point) == 5):
+            self.trajectory_point.pop(0)
+        self.trajectory_point.append([self.x, self.y])
+
     def update_base(self, base_x, base_y):
             # 回転の基準点を引数の内容に更新
         if (self.FLG_ROT):
             super().baseupdate(base_x, base_y) 
+
     def update_torot(self):
             # 周回後座標を計算して現在地を更新する
         if (self.FLG_ROT):
@@ -954,7 +1096,24 @@ class MIKU(SATELLITE):
         if pyxel.btnp(pyxel.KEY_SPACE) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_A):
             SHARI(self.x + (MIKU_WIDTH - BULLET_WIDTH) / 2, self.y - BULLET_HEIGHT / 2, self.addspeed)
             pyxel.play(0, 4)
-    def draw_circle(self): # 描画処理（自転のみ）
+
+    def update_laser(self):
+        if pyxel.btnp(pyxel.KEY_V) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_B):
+            LASER(self.x + (MIKU_WIDTH) / 2, self.y, pyxel.width, self.y, self.addspeed)
+            pyxel.play(0, 4)
+
+    def draw_circle(self): # 描画処理
+        # 加速状態にあるときは、軌跡を描画する
+        if(self.accelerated):
+            if (len(self.trajectory_point)>=5):
+                pyxel.blt(self.trajectory_point[4][0], self.trajectory_point[4][1], 1, 64, 16*((pyxel.frame_count - 4) % 8), 16, 16, 0)
+            if (len(self.trajectory_point)>=4):
+                pyxel.blt(self.trajectory_point[3][0], self.trajectory_point[3][1], 1, 64, 16*((pyxel.frame_count - 3) % 8), 16, 16, 0)        
+            if (len(self.trajectory_point)>=3):
+                pyxel.blt(self.trajectory_point[2][0], self.trajectory_point[2][1], 1, 64, 16*((pyxel.frame_count - 2) % 8), 16, 16, 0)
+            if (len(self.trajectory_point)>=2):
+                pyxel.blt(self.trajectory_point[1][0], self.trajectory_point[1][1], 1, 64, 16*((pyxel.frame_count - 1) % 8), 16, 16, 0)
+
         # 被弾後フレームカウント有効中は点滅表示（描画無し／キャラ描画をフレームごとに切替）とする。
         # 通常、被弾後フレームカウントは0なので、余り0のとき描画を行うようにする。
         if (self.after_damage_frame % 2 == 0):
@@ -970,6 +1129,137 @@ class MIKU(SATELLITE):
              self.y - math.ceil(10*math.sin((pyxel.frame_count + self.x + self.y) % 90)), \
              1, 0, 16*(pyxel.frame_count % 8), 16, 16, 0)
 
+class LASER():
+    # 初期化
+    def __init__(self, x, y, target_x, target_y, addspeed):
+        self.x = x
+        self.y = y
+        self.target_x = target_x
+        self.target_y = target_y
+        self.addspeed = addspeed
+        self.w = 3
+        self.h = 3
+        self.pre_shotangle = 0
+        self.shot_angle = 0
+        self.angle_uv = 0
+        self.dx, self.dy = (0, 0)
+        self.ux, self.uy = (0, 0)
+        self.vx, self.vy = (0, 0)
+        self.du, self.dv = (0, 0)
+        self.nearest_x, self.nearest_y = pyxel.width, self.y
+        # 速度の指定
+        self.speed = LASER_SPEED + self.addspeed
+        # 軌跡描画用の座標記録配列
+        self.trajectory_point = []
+        self.trajectory_point.append([self.x, self.y])
+        ### -------draw用の射出方向決定処理
+        self.update_nearest_obj()
+        self.update_targetlock()
+        self.is_alive = True
+        lasers.append(self)
+
+    def update(self):
+        # 最も近い敵性オブジェクトを判定しターゲット座標に指定する
+        self.update_nearest_obj()
+        # ターゲット座標とレーザーの現在座標から進行方向角度を更新する
+        self.update_targetlock() 
+        # Speedと進行方向角度に基づいて進行、レーザー座標を更新する
+        self.update_xy()
+
+    def check_nearest_forward_obj_axis(self, list):
+        # 指定のリストオブジェクトのうち最も近いものの座標を返す
+        rtn_x, rtn_y = pyxel.width, self.y
+        rtn_distance = pyxel.width
+        for elem in list:
+            # 存在フラグが有効なものについてのみ距離を測る
+            if (elem.is_alive and elem.x >= self.x):
+                distance = math.sqrt((elem.x - self.x)**2 + (elem.y - self.y)**2)
+                if (distance <= rtn_distance):
+                    (rtn_x, rtn_y) = (elem.x, elem.y)
+                    rtn_distance = distance
+        return (rtn_x, rtn_y)
+
+    def update_nearest_obj(self):
+            # 最も近い攻撃可能オブジェクトの座標を取得し、ターゲットとする
+            tmp_x1, tmp_y1 = self.check_nearest_forward_obj_axis(sushineta)
+            tmp_x2, tmp_y2 = self.check_nearest_forward_obj_axis(shoyu)
+            tmp_x3, tmp_y3 = self.check_nearest_forward_obj_axis(shoyu_bullets)
+            distance1 = math.sqrt((tmp_x1 - self.x)**2 + (tmp_y1 - self.y)**2)
+            distance2 = math.sqrt((tmp_x2 - self.x)**2 + (tmp_y2 - self.y)**2)
+            distance3 = math.sqrt((tmp_x3 - self.x)**2 + (tmp_y3 - self.y)**2)
+            distance = min(distance1, distance2, distance3)
+            # 最も近い敵性オブジェクト迄の距離が一定値以下になると、自身を加速させる
+            if (distance <= 15):
+                self.speed += 1
+            # 最も近い敵性オブジェクトの座標をnearestな座標として保持する
+            if  (distance == distance1):
+                self.nearest_x, self.nearest_y = tmp_x1, tmp_y1
+            elif(distance == distance2):
+                self.nearest_x, self.nearest_y = tmp_x2, tmp_y2
+            else:
+                self.nearest_x, self.nearest_y = tmp_x3, tmp_y3
+            self.target_x, self.target_y = self.nearest_x, self.nearest_y
+
+    def update_targetlock(self):
+        # shotangleuvを退避
+        self.pre_shotangle = self.angle_uv
+        # 弾→標的ベクトルd(dx, dy)
+        self.update_dxdy(self.x, self.y, self.target_x, self.target_y)
+        # 射出角度
+        self.update_shotangle(self.dx, self.dy)
+        # uv座標系での角度を求める
+        self.update_uvaxis_shotangle()
+        # 進行方向に標的が位置している場合、値は0となる
+        # self.update_upperanglecheck()
+    def update_uvaxis_shotangle(self):
+        ### -------射出方向判定用のuv直交系の計算 
+        # 弾の進行方向u(ux,uy)
+        self.update_vector_u(self.speed, self.shot_angle)
+        # uに直交するベクトルv
+        self.update_vector_v(self.ux, self.uy)
+        # uv座標系で弾→標的ベクトルduv（du, dv）
+        self.update_dudv(self.dx, self.dy, self.ux, self.uy, self.vx, self.vy)
+        # uv座標系での進行方向angle_uv
+        self.update_angleuv(self.du, self.dv)
+    def update_vector_u(self, speed, angle):
+        self.ux = speed * pyxel.cos(angle)
+        self.uy = speed * pyxel.sin(angle)
+    def update_vector_v(self, ux, uy):
+        self.vx = uy
+        self.vy = -ux
+    def update_dudv(self, dx, dy, ux, uy, vx, vy):
+        self.du = dx * ux + dy * uy
+        self.dv = dx * vx + dy * vy
+    def update_angleuv(self, du, dv):
+        self.angle_uv = pyxel.atan2(du, dv)
+    def update_dxdy(self,  x, y, target_x, target_y):
+        self.dx = target_x - x
+        self.dy = target_y - y
+    def update_shotangle(self, dx, dy):
+        self.shot_angle = pyxel.atan2(dx, dy)
+    def update_check_upperangle(self):
+        if(self.angle_uv > math.pi * 1/2):
+            self.angle_uv = math.pi * 1/2
+
+    def update_xy(self):
+        self.x += pyxel.ceil(self.speed * pyxel.cos(self.angle_uv))
+        self.y += pyxel.ceil(self.speed * pyxel.sin(self.angle_uv))
+        if (len(self.trajectory_point) == 5):
+            self.trajectory_point.pop(0)
+        self.trajectory_point.append([self.x, self.y])
+
+    def draw(self):
+        # レーザー弾の軌跡を描く
+        if (len(self.trajectory_point)>=5):
+            pyxel.line(self.trajectory_point[3][0], self.trajectory_point[3][1], self.trajectory_point[4][0], self.trajectory_point[4][1], 7)
+        if (len(self.trajectory_point)>=4):
+            pyxel.line(self.trajectory_point[2][0], self.trajectory_point[2][1], self.trajectory_point[3][0], self.trajectory_point[3][1], 6)
+        if (len(self.trajectory_point)>=3):
+            pyxel.line(self.trajectory_point[1][0], self.trajectory_point[1][1], self.trajectory_point[2][0], self.trajectory_point[2][1], 12)
+        if (len(self.trajectory_point)>=2):
+            pyxel.line(self.trajectory_point[0][0], self.trajectory_point[0][1], self.trajectory_point[1][0], self.trajectory_point[1][1], 5)
+        # レーザー弾の弾頭を描く
+        pyxel.circ(self.x, self.y, 2, 10)
 
 class SUSHI(SATELLITE):
     # 初期化
@@ -1052,7 +1342,7 @@ class ITEM(GameObject):
             self.is_alive = False
 
     def draw(self):
-        pyxel.blt(self.x, self.y, 1, 48 + 16*self.pattern, 16*(pyxel.frame_count % 8), 16, 16, 0)
+        pyxel.blt(self.x, self.y, 1, 80 + 16*self.pattern, 16*(pyxel.frame_count % 8), 16, 16, 0)
 
 class NETA(GameObject):
     # 敵
