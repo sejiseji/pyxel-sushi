@@ -50,6 +50,8 @@ BULLET_HEIGHT = 8
 BULLET_SPEED  = 4
 # レーザー弾
 LASER_SPEED  = 8
+# レーザー弾着弾時の衝撃アニメ表示フレーム数
+KIRAKIRA2_CNT = 6
 # 着弾時衝撃
 BLAST_START_RADIUS = 1
 BLAST_END_RADIUS   = 8
@@ -520,7 +522,7 @@ class App:
                     )
                     pyxel.play(1, 9)
 
-        # 寿司ネタとシャリの当たり判定
+        # 寿司ネタとレーザーの当たり判定
         for enemy in sushineta:
             for bullet in lasers:
                 if (
@@ -534,6 +536,8 @@ class App:
                     blasts.append(
                         Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
                     )
+                    blasts[len(blasts)-1].kirakira2 = True
+                    blasts[len(blasts)-1].kirakira_cnt = KIRAKIRA2_CNT
                     pyxel.play(1, 5)
                     if(enemy.pattern == 0):
                         self.sushiset_r[0].exists = True
@@ -557,7 +561,7 @@ class App:
                         self.sushiset_r[6].exists = True
                         self.score_6 += SCORE_6
 
-        # 醤油（魚）とシャリの当たり判定
+        # 醤油（魚）とレーザーの当たり判定
         for enemy in shoyu:
             for bullet in lasers:
                 if (
@@ -571,6 +575,8 @@ class App:
                     blasts.append(
                         Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
                     )
+                    blasts[len(blasts)-1].kirakira2 = True
+                    blasts[len(blasts)-1].kirakira_cnt = KIRAKIRA2_CNT
                     pyxel.play(1, 5)
                     self.score_shoyu += SCORE_SHOYU
 
@@ -588,6 +594,8 @@ class App:
                     blasts.append(
                         Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
                     )
+                    blasts[len(blasts)-1].kirakira2 = True
+                    blasts[len(blasts)-1].kirakira_cnt = KIRAKIRA2_CNT
                     pyxel.play(1, 9)
 
         # 被弾後の規定フレーム数間はダメージを受けない。被弾後フレームカウントを減らす。
@@ -1100,7 +1108,7 @@ class MIKU(SATELLITE):
     def update_laser(self):
         if pyxel.btnp(pyxel.KEY_V) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_B):
             LASER(self.x + (MIKU_WIDTH) / 2, self.y, pyxel.width, self.y, self.addspeed)
-            pyxel.play(0, 4)
+            pyxel.play(0, 10)
 
     def draw_circle(self): # 描画処理
         # 加速状態にあるときは、軌跡を描画する
@@ -1259,7 +1267,8 @@ class LASER():
         if (len(self.trajectory_point)>=2):
             pyxel.line(self.trajectory_point[0][0], self.trajectory_point[0][1], self.trajectory_point[1][0], self.trajectory_point[1][1], 5)
         # レーザー弾の弾頭を描く
-        pyxel.circ(self.x, self.y, 2, 10)
+        # pyxel.circ(self.x, self.y, 2, 10)
+            pyxel.blt(self.x - 2, self.y - 2, 1, 0, 160 + 5*(pyxel.frame_count % 4), 5, 5, 0)
 
 class SUSHI(SATELLITE):
     # 初期化
@@ -1433,12 +1442,13 @@ class Blast: # 着弾時の衝撃波
         self.y = y
         self.radius = BLAST_START_RADIUS
         self.is_alive = True
-        self.kirakira = False
+        self.kirakira = False # アイテム取得時のキラキラ表現
+        self.kirakira2 = False # レーザー着弾時の光の表現
         self.kirakira_cnt = 0
         blasts.append(self)
 
     def update(self):
-        if(self.kirakira):
+        if(self.kirakira or self.kirakira2):
             if(self.kirakira_cnt == 0):
                 self.is_alive = False
         else:
@@ -1449,6 +1459,9 @@ class Blast: # 着弾時の衝撃波
     def draw(self):
         if(self.kirakira and self.kirakira_cnt > 0):
             pyxel.blt(self.x, self.y, 0, 112, 32 + 16*(pyxel.frame_count % 4), 16, 16, 11)
+            self.kirakira_cnt -= 1
+        elif(self.kirakira2 and self.kirakira_cnt > 0):
+            pyxel.blt(self.x, self.y, 0, 128, 32 + 16*(pyxel.frame_count % 6), 16, 16, 11)
             self.kirakira_cnt -= 1
         else:
             pyxel.circ(self.x, self.y, self.radius, BLAST_COLOR_IN)
