@@ -447,12 +447,12 @@ class App:
 
                 # アイテム種別ごとの挙動
                 if(item.pattern == 0): # ハート
-                    pyxel.play(1, 7)
+                    pyxel.play(2, 7)
                     self.score_heart += SCORE_HEART
                     if(self.miku.hp <= 2):
                         self.miku.hp += 1
                 if(item.pattern == 1): # 加速アイテム
-                    pyxel.play(1, 7)
+                    pyxel.play(2, 7)
                     self.miku.accelerated = True
                     self.accelerated_time = ACCELERATED_TIME # 規定frameだけ有効にするため、値をセットする
 
@@ -542,7 +542,7 @@ class App:
                     )
                     blasts[len(blasts)-1].kirakira2 = True
                     blasts[len(blasts)-1].kirakira_cnt = KIRAKIRA2_CNT
-                    pyxel.play(1, 5)
+                    pyxel.play(1, 15)
                     if(enemy.pattern == 0):
                         self.sushiset_r[0].exists = True
                         self.score_0 += SCORE_0
@@ -581,7 +581,7 @@ class App:
                     )
                     blasts[len(blasts)-1].kirakira2 = True
                     blasts[len(blasts)-1].kirakira_cnt = KIRAKIRA2_CNT
-                    pyxel.play(1, 5)
+                    pyxel.play(1, 15)
                     self.score_shoyu += SCORE_SHOYU
 
         # 醤油（弾）とレーザーの当たり判定
@@ -596,11 +596,11 @@ class App:
                     enemy.is_alive = False
                     bullet.is_alive = False
                     blasts.append(
-                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
+                        Blast(enemy.x + ENEMY_WIDTH / 2 - 5, enemy.y + ENEMY_HEIGHT / 2 - 5)
                     )
                     blasts[len(blasts)-1].kirakira2 = True
                     blasts[len(blasts)-1].kirakira_cnt = KIRAKIRA2_CNT
-                    pyxel.play(1, 9)
+                    pyxel.play(1, 15)
 
         # 被弾後の規定フレーム数間はダメージを受けない。被弾後フレームカウントを減らす。
         if (self.miku.after_damage_frame > 0):
@@ -673,7 +673,7 @@ class App:
                 self.kirakira_cnt = KIRAKIRA_CNT
                 self.kirakira_x = self.miku.x
                 self.kirakira_y = self.miku.y
-                pyxel.play(1, 6)
+                pyxel.play(2, 6)
 
         # INVINCIBLE_MODEの終了
         if(self.game_mode == INVINCIBLE_MODE):
@@ -1490,7 +1490,7 @@ class Blast: # 着弾時の衝撃波
             pyxel.blt(self.x, self.y, 0, 112, 32 + 16*(pyxel.frame_count % 4), 16, 16, 11)
             self.kirakira_cnt -= 1
         elif(self.kirakira2 and self.kirakira_cnt > 0):
-            pyxel.blt(self.x - 5, self.y - 5, 0, 128, 32 + 16*(pyxel.frame_count % 6), 16, 16, 11)
+            pyxel.blt(self.x - 5, self.y - 5, 0, 128, 32 + 16*(pyxel.frame_count % 6), 16, 16, 0)
             self.kirakira_cnt -= 1
         else:
             pyxel.circ(self.x, self.y, self.radius, BLAST_COLOR_IN)
