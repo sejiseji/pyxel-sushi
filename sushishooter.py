@@ -5,6 +5,8 @@ import webbrowser
 from pyquaternion import Quaternion
 
 #-----------------------------------------------
+# BGM
+MUSIC_NO = 0
 # GAME状態
 SCENE_TITLE = 0
 SCENE_PLAY = 1
@@ -81,6 +83,8 @@ SCORE_HEART = 100
 SCORE_SHOYU = 40
 # 加速アイテムを取得した際の有効時間（frame数）
 ACCELERATED_TIME = 100
+# 加速アイテム取得による増分
+ACCELERATED_SPEED = 3
 
 #-----------------------------------------------
 # >> オブジェクト種別毎の配列
@@ -229,8 +233,8 @@ class App:
         self.kirakira_y = 0
         self.scene = SCENE_TITLE
         self.background = Background()
-        #BGM再生(MUSIC 0番をloop再生)
-        pyxel.playm(0, loop = True)
+        #BGM再生(指定MUSICNoをloop再生)
+        pyxel.playm(MUSIC_NO, loop = True)
         # アプリケーションの実行(更新関数、描画関数)
         pyxel.run(self.update, self.draw)
 
@@ -258,7 +262,7 @@ class App:
         # Miku自身SATELLITEを継承。
         # 回転の基準点を画面中央、衛星振舞い（回転）フラグ、周回時半径,編隊数1,隊内order1, 衛星としての初期位置調整値を指定し、単体で回転を行う。
         # 最後の値は加速状態時の追加速度。
-        self.miku = MIKU(100, 100, False, 16, 1, 1, 0, 2)
+        self.miku = MIKU(100, 100, False, 16, 1, 1, 0, ACCELERATED_SPEED)
         if(self.game_mode == HARD_MODE):
             self.miku.addspeed = 2
         
@@ -322,7 +326,7 @@ class App:
                     self.selectdelay_cnt = 3
 
     def post_tweet(self):
-        template_link = "https://twitter.com/intent/tweet?text=%0A-----------------------------%0A%E7%A7%81%E3%81%AE%E3%83%8F%E3%82%A4%E3%82%B9%E3%82%B3%E3%82%A2%E3%81%AF{}%E3%81%A7%E3%81%99%EF%BC%81%0A%3E%3ESUSHI%20SHOOTER%3C%3C%0Ahttps%3A%2F%2Fkitao.github.io%2Fpyxel%2Fwasm%2Flauncher%2F%3Fplay%3Dsejiseji.pyxel-sushi.sushishooter%26gamepad%3Denabled%0A%23Pyxel"
+        template_link = "https://twitter.com/intent/tweet?text=%0A-----------------------------%0A%E7%A7%81%E3%81%AE%E3%83%8F%E3%82%A4%E3%82%B9%E3%82%B3%E3%82%A2%E3%81%AF{}%E3%81%A7%E3%81%99%EF%BC%81%0A%3E%3ESUSHI%20SHOOTER%3C%3C%0Ahttps%3A%2F%2Fkitao.github.io%2Fpyxel%2Fwasm%2Flauncher%2F%3Fplay%3Dsejiseji.pyxel-sushi.sushishooter%26gamepad%3Denabled%26packages%3Dnumpy%0A%23Pyxel%20"
         result_score = self.hi_score
         form_link = template_link.format(result_score)
         webbrowser.open(form_link)
@@ -669,7 +673,7 @@ class App:
                 self.kirakira_cnt = KIRAKIRA_CNT
                 self.kirakira_x = self.miku.x
                 self.kirakira_y = self.miku.y
-                pyxel.play(2, 6)
+                pyxel.play(1, 6)
 
         # INVINCIBLE_MODEの終了
         if(self.game_mode == INVINCIBLE_MODE):
@@ -781,15 +785,17 @@ class App:
     def draw_key_list(self):
         # 操作方法の画面表示
         self.text_color = TEXT_COLOR
-        pyxel.text(9, 77, "KEYSTROKE", self.text_color)
-        pyxel.text(9, 90, "THROW RICE : PRESS SPACE / GAME PAD A", self.text_color)
-        pyxel.text(9, 98, "MOVE RIGHT : PRESS RIGHT / GAME PAD RIGHT", self.text_color)
+        pyxel.text(9,  61, "KEYSTROKE", self.text_color)
+        pyxel.text(9,  74, "THROW RICE : PRESS SPACE / GAME PAD A", self.text_color)
+        pyxel.text(9,  82, "EXTRA SHOT1: PRESS V     / GAME PAD B", self.text_color)
+        pyxel.text(9,  90, "-----------: PRESS C     / GAME PAD Y", self.text_color)
+        pyxel.text(9,  98, "MOVE RIGHT : PRESS RIGHT / GAME PAD RIGHT", self.text_color)
         pyxel.text(9, 106, "MOVE LEFT  : PRESS LEFT  / GAME PAD LEFT", self.text_color)
         pyxel.text(9, 114, "MOVE UP    : PRESS UP    / GAME PAD UP", self.text_color)
         pyxel.text(9, 122, "MOVE DOWN  : PRESS DOWN  / GAME PAD DOWN", self.text_color)
         pyxel.text(9, 130, "GAME START : PRESS ENTER / GAME PAD X", self.text_color)
         pyxel.text(9, 138, "GAME END   : PRESS Q     / CLOSE BROWSER", self.text_color)
-        pyxel.rectb(4, 85, 173, 63, self.text_color)
+        pyxel.rectb(4, 69, 173, 79, self.text_color)
 
     def draw_score_list(self):
         # スコアの画面表
@@ -804,24 +810,26 @@ class App:
         pyxel.text(185, 138, f"SAURY           :{int(self.score_6 / SCORE_6 if self.score_6 != 0 else 0):4}", self.text_color)
         pyxel.text(185, 146, f"SUSHI-7         :{int(self.score_sushiall / SCORE_SUSHIALL if self.score_sushiall != 0 else 0):4} times", self.text_color)
         pyxel.text(185, 154, f"HEART           :{int(self.score_heart / SCORE_HEART if self.score_heart != 0 else 0):4}", self.text_color)
-        pyxel.text(185, 162, f"SOYSAUCE BOTTLE :{int(self.score_shoyu / SCORE_SHOYU if self.score_shoyu != 0 else 0):4}", self.text_color)
+        pyxel.text(185, 162, f"SOYSAUCE PITCHER:{int(self.score_shoyu / SCORE_SHOYU if self.score_shoyu != 0 else 0):4}", self.text_color)
         pyxel.rectb(181, 85, 115, 87, self.text_color)
 
     def draw_howtoplay(self):
         # 遊び方表示
         self.text_color = TEXT_COLOR
-        pyxel.text(185, 77, "HOW TO PLAY", self.text_color)
-        pyxel.text(185, 90, "Throw and hit the rice to ", self.text_color)
-        pyxel.text(185, 98, "get the corresponding sushi.", self.text_color)
-        pyxel.text(185, 106, "There are seven types of ", self.text_color)
-        pyxel.text(185, 114, "sushi, and you will receive", self.text_color)
-        pyxel.text(185, 122, "a bonus if you take all of", self.text_color)
-        pyxel.text(185, 130, "them.A soy sauce pitcher ", self.text_color)
-        pyxel.text(185, 138, "ejects soy sauce.If you ", self.text_color)
-        pyxel.text(185, 146, "touch the soy sauce or the", self.text_color)
-        pyxel.text(185, 154, "soy sauce jug, you will be", self.text_color)
-        pyxel.text(185, 162, "damaged.Heart restore life.", self.text_color)
-        pyxel.rectb(181, 85, 115, 87, self.text_color)
+        pyxel.text(185, 61, "HOW TO PLAY", self.text_color)
+        pyxel.text(185, 74, "THROW AND HIT THE RICE TO ", self.text_color)
+        pyxel.text(185, 82, "GET THE SUSHI. & USE SHOTS.", self.text_color)
+        pyxel.text(185, 90, "THERE ARE SEVEN TYPES OF ", self.text_color)
+        pyxel.text(185, 98, "SUSHI, AND YOU WILL RECEIVE", self.text_color)
+        pyxel.text(185, 106, "A BONUS IF YOU TAKE ALL OF", self.text_color)
+        pyxel.text(185, 114, "THEM. A SOY SAUCE PITCHER ", self.text_color)
+        pyxel.text(185, 122, "EJECTS SOY SAUCE. IF YOU ", self.text_color)
+        pyxel.text(185, 130, "TOUCH THE SOY SAUCE OR THE", self.text_color)
+        pyxel.text(185, 138, "SOY SAUCE JUG, YOU WILL BE", self.text_color)
+        pyxel.text(185, 146, "DAMAGED. GET ITEMS TO USE.", self.text_color)
+        pyxel.text(185, 154, "SELECT GAME MODE AND START", self.text_color)
+        pyxel.text(185, 162, "ENJOYING SUSHISHOOTER !!", self.text_color)
+        pyxel.rectb(181, 69, 115, 103, self.text_color)
 
     def draw_gamemode(self):
         self.text_color_base = TEXT_COLOR
@@ -847,8 +855,8 @@ class App:
         pyxel.rectb(4, 159, 173, 13, self.text_color_base)
 
     def draw_title_scene(self):
-        pyxel.text(125, 50, "Sushi Shooter", pyxel.frame_count % 16)
-        pyxel.text(121, 66, "- PRESS ENTER -", 11)
+        pyxel.text(125, 30, "SUSHI SHOOTER", pyxel.frame_count % 16)
+        pyxel.text(80, 45, "- SELECT GAME MODE, PRESS ENTER -", 11)
         self.draw_key_list()
         self.draw_gamemode()
         self.draw_howtoplay()
@@ -901,6 +909,7 @@ class App:
         if(self.kirakira_cnt > 0):
             pyxel.text(self.kirakira_x, self.kirakira_y + 10, "Yummy!!", pyxel.frame_count % 16)
             self.kirakira_cnt -= 1
+
         # 無敵モードの終了案内
         if(self.game_mode == INVINCIBLE_MODE) :
                 pyxel.text(50, 17, "- NOW ON INVINCIBLE MODE, PRESS Enter TO TITLE -", 7)
@@ -918,9 +927,9 @@ class App:
         draw_list(shoyu)
         draw_list(lasers)
         if(self.hiscore_updt_flg):
-            pyxel.text(81, 58, "Congratulation!! HI-SCORE updated!!", pyxel.frame_count % 16)
-        pyxel.text(133, 50, "GAME OVER", 8)
-        pyxel.text(101, 66, "- PRESS ENTER TO REPLAY -", 11)
+            pyxel.text(81, 38, "Congratulation!! HI-SCORE updated!!", pyxel.frame_count % 16)
+        pyxel.text(133, 30, "GAME OVER", 8)
+        pyxel.text(101, 45, "- PRESS ENTER TO REPLAY -", 11)
         self.draw_key_list()
         self.draw_gamemode()
         self.draw_score_list()
@@ -1103,12 +1112,26 @@ class MIKU(SATELLITE):
     def update_shari(self):
         if pyxel.btnp(pyxel.KEY_SPACE) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_A):
             SHARI(self.x + (MIKU_WIDTH - BULLET_WIDTH) / 2, self.y - BULLET_HEIGHT / 2, self.addspeed)
-            pyxel.play(0, 4)
+            pyxel.play(1, 4)
 
     def update_laser(self):
         if pyxel.btnp(pyxel.KEY_V) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_B):
-            LASER(self.x + (MIKU_WIDTH) / 2, self.y, pyxel.width, self.y, self.addspeed)
-            pyxel.play(0, 10)
+            # 単体発射
+            # LASER(self.x + (MIKU_WIDTH) / 2, self.y, pyxel.width, self.y, self.addspeed)
+
+            # 同時に存在する段数を制限する。
+            lasers_alive = 0
+            for elm in lasers:
+                if elm.is_alive:
+                    lasers_alive += 1
+            # 複数同時発射。ただし最大15発展開。
+            if lasers_alive <= 10 :
+                LASER(self.x + (MIKU_WIDTH) / 2 - 15, self.y - 20, pyxel.width, self.y, self.addspeed)
+                LASER(self.x + (MIKU_WIDTH) / 2 + 5, self.y - 10, pyxel.width, self.y, self.addspeed)
+                LASER(self.x + (MIKU_WIDTH) / 2 + 10, self.y, pyxel.width, self.y, self.addspeed)
+                LASER(self.x + (MIKU_WIDTH) / 2 + 5, self.y + 10, pyxel.width, self.y, self.addspeed)
+                LASER(self.x + (MIKU_WIDTH) / 2 - 15, self.y + 20, pyxel.width, self.y, self.addspeed)
+                pyxel.play(1, 10)
 
     def draw_circle(self): # 描画処理
         # 加速状態にあるときは、軌跡を描画する
@@ -1252,9 +1275,15 @@ class LASER():
     def update_xy(self):
         self.x += pyxel.ceil(self.speed * pyxel.cos(self.angle_uv))
         self.y += pyxel.ceil(self.speed * pyxel.sin(self.angle_uv))
+        # 軌跡を描画するために座標履歴を保持する
         if (len(self.trajectory_point) == 5):
             self.trajectory_point.pop(0)
         self.trajectory_point.append([self.x, self.y])
+        # 画面左右端を超えたとき、存在フラグを折る
+        if self.x > pyxel.width:
+            self.is_alive = False
+        if self.x < 0:
+            self.is_alive = False
 
     def draw(self):
         # レーザー弾の軌跡を描く
@@ -1268,7 +1297,7 @@ class LASER():
             pyxel.line(self.trajectory_point[0][0], self.trajectory_point[0][1], self.trajectory_point[1][0], self.trajectory_point[1][1], 5)
         # レーザー弾の弾頭を描く
         # pyxel.circ(self.x, self.y, 2, 10)
-            pyxel.blt(self.x - 2, self.y - 2, 1, 0, 160 + 5*(pyxel.frame_count % 4), 5, 5, 0)
+        pyxel.blt(self.x - 2, self.y - 2, 1, 0, 160 + 5*(pyxel.frame_count % 4), 5, 5, 0)
 
 class SUSHI(SATELLITE):
     # 初期化
@@ -1461,7 +1490,7 @@ class Blast: # 着弾時の衝撃波
             pyxel.blt(self.x, self.y, 0, 112, 32 + 16*(pyxel.frame_count % 4), 16, 16, 11)
             self.kirakira_cnt -= 1
         elif(self.kirakira2 and self.kirakira_cnt > 0):
-            pyxel.blt(self.x, self.y, 0, 128, 32 + 16*(pyxel.frame_count % 6), 16, 16, 11)
+            pyxel.blt(self.x - 5, self.y - 5, 0, 128, 32 + 16*(pyxel.frame_count % 6), 16, 16, 11)
             self.kirakira_cnt -= 1
         else:
             pyxel.circ(self.x, self.y, self.radius, BLAST_COLOR_IN)
