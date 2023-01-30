@@ -50,6 +50,10 @@ ENEMY_SPEED   = 3
 BULLET_WIDTH  = 8
 BULLET_HEIGHT = 8
 BULLET_SPEED  = 4
+# 星弾
+STAR_BULLET_WIDTH  = 16
+STAR_BULLET_HEIGHT = 16
+STAR_BULLET_SPEED  = 5
 # レーザー弾
 LASER_SPEED  = 8
 # レーザー弾着弾時の衝撃アニメ表示フレーム数
@@ -71,13 +75,13 @@ SHOYU_BULLET_SPEED  = 4
 KIRAKIRA_CNT = 24
 # 得点単価のセット
 # 0:まぐろ 1:はまち 2:たまご 3:とろ軍艦 4:サーモン 5:えび 6:さんま
-SCORE_0 = 5
-SCORE_1 = 10
-SCORE_2 = 15
-SCORE_3 = 20
-SCORE_4 = 25
-SCORE_5 = 30
-SCORE_6 = 35
+SCORE_0 = 4
+SCORE_1 = 5
+SCORE_2 = 2
+SCORE_3 = 8
+SCORE_4 = 10
+SCORE_5 = 6
+SCORE_6 = 7
 SCORE_SUSHIALL = 200
 SCORE_HEART = 100
 SCORE_SHOYU = 40
@@ -100,6 +104,8 @@ blasts = []
 shoyu = []
 # 醬油弾
 shoyu_bullets = []
+# 星弾
+star_bullets = []
 # レーザー弾
 lasers = []
 #-----------------------------------------------
@@ -240,6 +246,17 @@ class App:
 
     def init(self):
         pyxel.load("sushishooter.pyxres")
+        # 撃墜・取得数の初期化
+        self.score_0_get = 0
+        self.score_1_get = 0
+        self.score_2_get = 0
+        self.score_3_get = 0
+        self.score_4_get = 0
+        self.score_5_get = 0
+        self.score_6_get = 0
+        self.score_heart_get = 0
+        self.score_sushiall_get = 0
+        self.score_shoyu_get = 0
         # 得点の初期化
         self.score_0 = 0
         self.score_1 = 0
@@ -344,7 +361,7 @@ class App:
     def update_play_scene(self):
         
         self.miku.update_recordxy() # 現在位置の記録
-        self.miku.update_shari() # シャリの射出
+        self.miku.update_bullet() # シャリ弾／星弾の射出
         self.miku.update_laser() # レーザーの射出
         self.miku.update_btn() # 上下左右キーで位置座標の増減分dx,dyを取得
         self.update_accelerated() # 加速状態の残り時間を更新する
@@ -354,6 +371,9 @@ class App:
 
         update_list(shari_bullets) # シャリ弾の状態を更新
         cleanup_list(shari_bullets)
+
+        update_list(star_bullets)
+        cleanup_list(star_bullets)
 
         update_list(sushineta) # 敵寿司ネタの状態を更新
         cleanup_list(sushineta)
@@ -448,7 +468,8 @@ class App:
                 # アイテム種別ごとの挙動
                 if(item.pattern == 0): # ハート
                     pyxel.play(2, 7)
-                    self.score_heart += SCORE_HEART
+                    self.score_heart += (SCORE_HEART * (1 + self.miku.feather_flg))
+                    self.score_heart_get += 1
                     if(self.miku.hp <= 2):
                         self.miku.hp += 1
                 if(item.pattern == 1): # 加速アイテム
@@ -473,25 +494,32 @@ class App:
                     pyxel.play(1, 5)
                     if(enemy.pattern == 0):
                         self.sushiset_r[0].exists = True
-                        self.score_0 += SCORE_0
+                        self.score_0 += (SCORE_0 * (1 + self.miku.feather_flg))
+                        self.score_0_get += 1
                     if(enemy.pattern == 1):
                         self.sushiset_r[1].exists = True
-                        self.score_1 += SCORE_1
+                        self.score_1 += (SCORE_1 * (1 + self.miku.feather_flg))
+                        self.score_1_get += 1
                     if(enemy.pattern == 2):
                         self.sushiset_r[2].exists = True
-                        self.score_2 += SCORE_2
+                        self.score_2 += (SCORE_2 * (1 + self.miku.feather_flg))
+                        self.score_2_get += 1
                     if(enemy.pattern == 3):
                         self.sushiset_r[3].exists = True
-                        self.score_3 += SCORE_3
+                        self.score_3 += (SCORE_3 * (1 + self.miku.feather_flg))
+                        self.score_3_get += 1
                     if(enemy.pattern == 4):
                         self.sushiset_r[4].exists = True
-                        self.score_4 += SCORE_4
+                        self.score_4 += (SCORE_4 * (1 + self.miku.feather_flg))
+                        self.score_4_get += 1
                     if(enemy.pattern == 5):
                         self.sushiset_r[5].exists = True
-                        self.score_5 += SCORE_5
+                        self.score_5 += (SCORE_5 * (1 + self.miku.feather_flg))
+                        self.score_5_get += 1
                     if(enemy.pattern == 6):
                         self.sushiset_r[6].exists = True
-                        self.score_6 += SCORE_6
+                        self.score_6 += (SCORE_6 * (1 + self.miku.feather_flg))
+                        self.score_6_get += 1
 
         # 醤油（魚）とシャリの当たり判定
         for enemy in shoyu:
@@ -508,7 +536,8 @@ class App:
                         Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
                     )
                     pyxel.play(1, 5)
-                    self.score_shoyu += SCORE_SHOYU
+                    self.score_shoyu += (SCORE_SHOYU * (1 + self.miku.feather_flg))
+                    self.score_shoyu_get += 1
 
         # 醤油（弾）とシャリの当たり判定
         for enemy in shoyu_bullets:
@@ -521,6 +550,81 @@ class App:
                 ):
                     enemy.is_alive = False
                     bullet.is_alive = False
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
+                    )
+                    pyxel.play(1, 9)
+
+        # 寿司ネタと星弾の当たり判定
+        for enemy in sushineta:
+            for bullet in star_bullets:
+                if (
+                    enemy.y + enemy.h > bullet.y
+                    and bullet.y + bullet.h > enemy.y
+                    and enemy.x + enemy.w > bullet.x
+                    and bullet.x + bullet.w > enemy.x
+                ):
+                    enemy.is_alive = False
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
+                    )
+                    pyxel.play(1, 5)
+                    if(enemy.pattern == 0):
+                        self.sushiset_r[0].exists = True
+                        self.score_0 += (SCORE_0 * (1 + self.miku.feather_flg))
+                        self.score_0_get += 1
+                    if(enemy.pattern == 1):
+                        self.sushiset_r[1].exists = True
+                        self.score_1 += (SCORE_1 * (1 + self.miku.feather_flg))
+                        self.score_1_get += 1
+                    if(enemy.pattern == 2):
+                        self.sushiset_r[2].exists = True
+                        self.score_2 += (SCORE_2 * (1 + self.miku.feather_flg))
+                        self.score_2_get += 1
+                    if(enemy.pattern == 3):
+                        self.sushiset_r[3].exists = True
+                        self.score_3 += (SCORE_3 * (1 + self.miku.feather_flg))
+                        self.score_3_get += 1
+                    if(enemy.pattern == 4):
+                        self.sushiset_r[4].exists = True
+                        self.score_4 += (SCORE_4 * (1 + self.miku.feather_flg))
+                        self.score_4_get += 1
+                    if(enemy.pattern == 5):
+                        self.sushiset_r[5].exists = True
+                        self.score_5 += (SCORE_5 * (1 + self.miku.feather_flg))
+                        self.score_5_get += 1
+                    if(enemy.pattern == 6):
+                        self.sushiset_r[6].exists = True
+                        self.score_6 += (SCORE_6 * (1 + self.miku.feather_flg))
+                        self.score_6_get += 1
+
+        # 醤油（魚）と星弾の当たり判定
+        for enemy in shoyu:
+            for bullet in star_bullets:
+                if (
+                    enemy.y + enemy.h > bullet.y
+                    and bullet.y + bullet.h > enemy.y
+                    and enemy.x + enemy.w > bullet.x
+                    and bullet.x + bullet.w > enemy.x
+                ):
+                    enemy.is_alive = False
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
+                    )
+                    pyxel.play(1, 5)
+                    self.score_shoyu += (SCORE_SHOYU * (1 + self.miku.feather_flg))
+                    self.score_shoyu_get += 1
+
+        # 醤油（弾）と星弾の当たり判定
+        for enemy in shoyu_bullets:
+            for bullet in star_bullets:
+                if (
+                    enemy.y + enemy.h > bullet.y
+                    and bullet.y + bullet.h > enemy.y
+                    and enemy.x + enemy.w > bullet.x
+                    and bullet.x + bullet.w > enemy.x
+                ):
+                    enemy.is_alive = False
                     blasts.append(
                         Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2)
                     )
@@ -545,25 +649,32 @@ class App:
                     pyxel.play(1, 15)
                     if(enemy.pattern == 0):
                         self.sushiset_r[0].exists = True
-                        self.score_0 += SCORE_0
+                        self.score_0 += (SCORE_0 * (1 + self.miku.feather_flg)) # feather状態中は得点2倍
+                        self.score_0_get += 1
                     if(enemy.pattern == 1):
                         self.sushiset_r[1].exists = True
-                        self.score_1 += SCORE_1
+                        self.score_1 += (SCORE_1 * (1 + self.miku.feather_flg))
+                        self.score_1_get += 1
                     if(enemy.pattern == 2):
                         self.sushiset_r[2].exists = True
-                        self.score_2 += SCORE_2
+                        self.score_2 += (SCORE_2 * (1 + self.miku.feather_flg))
+                        self.score_2_get += 1
                     if(enemy.pattern == 3):
                         self.sushiset_r[3].exists = True
-                        self.score_3 += SCORE_3
+                        self.score_3 += (SCORE_3 * (1 + self.miku.feather_flg))
+                        self.score_3_get += 1
                     if(enemy.pattern == 4):
                         self.sushiset_r[4].exists = True
-                        self.score_4 += SCORE_4
+                        self.score_4 += (SCORE_4 * (1 + self.miku.feather_flg))
+                        self.score_4_get += 1
                     if(enemy.pattern == 5):
                         self.sushiset_r[5].exists = True
-                        self.score_5 += SCORE_5
+                        self.score_5 += (SCORE_5 * (1 + self.miku.feather_flg))
+                        self.score_5_get += 1
                     if(enemy.pattern == 6):
                         self.sushiset_r[6].exists = True
-                        self.score_6 += SCORE_6
+                        self.score_6 += (SCORE_6 * (1 + self.miku.feather_flg))
+                        self.score_6_get += 1
 
         # 醤油（魚）とレーザーの当たり判定
         for enemy in shoyu:
@@ -582,7 +693,8 @@ class App:
                     blasts[len(blasts)-1].kirakira2 = True
                     blasts[len(blasts)-1].kirakira_cnt = KIRAKIRA2_CNT
                     pyxel.play(1, 15)
-                    self.score_shoyu += SCORE_SHOYU
+                    self.score_shoyu += (SCORE_SHOYU * (1 + self.miku.feather_flg))
+                    self.score_shoyu_get += 1
 
         # 醤油（弾）とレーザーの当たり判定
         for enemy in shoyu_bullets:
@@ -600,7 +712,7 @@ class App:
                     )
                     blasts[len(blasts)-1].kirakira2 = True
                     blasts[len(blasts)-1].kirakira_cnt = KIRAKIRA2_CNT
-                    pyxel.play(1, 15)
+                    pyxel.play(1, 9)
 
         # 被弾後の規定フレーム数間はダメージを受けない。被弾後フレームカウントを減らす。
         if (self.miku.after_damage_frame > 0):
@@ -624,6 +736,10 @@ class App:
                             self.miku.y + self.miku.h / 2,
                         )
                     )
+                    # damageによってfeather状態を解除する
+                    if(self.miku.feather_flg == 1):
+                        self.miku.feather_flg = 0
+
                     if(self.game_mode in (NORMAL_MODE, HARD_MODE)):
                         self.miku.hp -= 1
                         if (self.miku.hp == 0):
@@ -662,9 +778,14 @@ class App:
         
         # 寿司衛星を全種揃えたことに対して加点後、周回衛星全ての存在フラグを折る、
         # 更にブラストを追加し、
-        # ブラストのキラキラ描画切替用のフラグをたてるとともに、キラキラ表示が有効な表示時間と位置を指定。
+        # ブラストのキラキラ描画切替用のフラグをたてるとともに、featherモード有効化、キラキラ表示が有効な表示時間と位置を指定。
         if(self.satellite_all_flg):
-            self.score_sushiall += SCORE_SUSHIALL
+            # 得点
+            self.score_sushiall += (SCORE_SUSHIALL * (1 + self.miku.feather_flg))
+            self.score_sushiall_get += 1
+            # feather状態を有効化する
+            self.miku.feather_flg = 1
+            # キラキラ表示
             for i in range(len(self.sushiset_r)):
                 self.sushiset_r[i].exists = False
                 blasts.append(Blast(self.sushiset_r[i].x + 16 / 2, self.sushiset_r[i].y + 16 / 2))
@@ -686,10 +807,10 @@ class App:
                            self.score_sushiall + self.score_shoyu
 
     def update_accelerated(self):
-        # 加速中時間が有効であれば、残りtimeを減らす
+        # 加速有効時間が正であれば、残りtimeを減らす
         if(self.accelerated_time > 0):
             self.accelerated_time -= 1
-            # 残り時間が0になったらmikuの加速状態を解除する
+            # 加速有効時間が0になったらmikuの加速状態を解除する
             if(self.accelerated_time == 0):
                 self.miku.accelerated = False
 
@@ -731,6 +852,18 @@ class App:
         self.kirakira_cnt = 0
         self.kirakira_x = 0
         self.kirakira_y = 0
+        # 撃墜数・取得数の初期化
+        self.score_0_get = 0
+        self.score_1_get = 0
+        self.score_2_get = 0
+        self.score_3_get = 0
+        self.score_4_get = 0
+        self.score_5_get = 0
+        self.score_6_get = 0
+        self.score_heart_get = 0
+        self.score_sushiall_get = 0
+        self.score_shoyu_get = 0
+        # 得点の初期化
         self.score_0 = 0
         self.score_1 = 0
         self.score_2 = 0
@@ -801,16 +934,26 @@ class App:
         # スコアの画面表
         self.text_color = TEXT_COLOR
         pyxel.text(185, 77, "YOUR SCORE DETAIL", self.text_color)
-        pyxel.text(185, 90, f"TUNA            :{int(self.score_0 / SCORE_0 if self.score_0 != 0 else 0):4}", self.text_color)
-        pyxel.text(185, 98, f"YELLOWTAIL      :{int(self.score_1 / SCORE_1 if self.score_1 != 0 else 0):4}", self.text_color)
-        pyxel.text(185, 106, f"EGG             :{int(self.score_2 / SCORE_2 if self.score_2 != 0 else 0):4}", self.text_color)
-        pyxel.text(185, 114, f"NEGITORO        :{int(self.score_3 / SCORE_3 if self.score_3 != 0 else 0):4}", self.text_color)
-        pyxel.text(185, 122, f"SALMON          :{int(self.score_4 / SCORE_4 if self.score_4 != 0 else 0):4}", self.text_color)
-        pyxel.text(185, 130, f"SHRIMP          :{int(self.score_5 / SCORE_5 if self.score_5 != 0 else 0):4}", self.text_color)
-        pyxel.text(185, 138, f"SAURY           :{int(self.score_6 / SCORE_6 if self.score_6 != 0 else 0):4}", self.text_color)
-        pyxel.text(185, 146, f"SUSHI-7         :{int(self.score_sushiall / SCORE_SUSHIALL if self.score_sushiall != 0 else 0):4} times", self.text_color)
-        pyxel.text(185, 154, f"HEART           :{int(self.score_heart / SCORE_HEART if self.score_heart != 0 else 0):4}", self.text_color)
-        pyxel.text(185, 162, f"SOYSAUCE PITCHER:{int(self.score_shoyu / SCORE_SHOYU if self.score_shoyu != 0 else 0):4}", self.text_color)
+        pyxel.text(185, 90, f"TUNA            :{int(self.score_0_get):4}", self.text_color)
+        pyxel.text(185, 98, f"YELLOWTAIL      :{int(self.score_1_get):4}", self.text_color)
+        pyxel.text(185, 106, f"EGG             :{int(self.score_2_get):4}", self.text_color)
+        pyxel.text(185, 114, f"NEGITORO        :{int(self.score_3_get):4}", self.text_color)
+        pyxel.text(185, 122, f"SALMON          :{int(self.score_4_get):4}", self.text_color)
+        pyxel.text(185, 130, f"SHRIMP          :{int(self.score_5_get):4}", self.text_color)
+        pyxel.text(185, 138, f"SAURY           :{int(self.score_6_get):4}", self.text_color)
+        pyxel.text(185, 146, f"SUSHI-7         :{int(self.score_sushiall_get):4} times", self.text_color)
+        pyxel.text(185, 154, f"HEART           :{int(self.score_heart_get):4}", self.text_color)
+        pyxel.text(185, 162, f"SOYSAUCE PITCHER:{int(self.score_shoyu_get):4}", self.text_color)
+        # pyxel.text(185, 90, f"TUNA            :{int(self.score_0 / SCORE_0 if self.score_0 != 0 else 0):4}", self.text_color)
+        # pyxel.text(185, 98, f"YELLOWTAIL      :{int(self.score_1 / SCORE_1 if self.score_1 != 0 else 0):4}", self.text_color)
+        # pyxel.text(185, 106, f"EGG             :{int(self.score_2 / SCORE_2 if self.score_2 != 0 else 0):4}", self.text_color)
+        # pyxel.text(185, 114, f"NEGITORO        :{int(self.score_3 / SCORE_3 if self.score_3 != 0 else 0):4}", self.text_color)
+        # pyxel.text(185, 122, f"SALMON          :{int(self.score_4 / SCORE_4 if self.score_4 != 0 else 0):4}", self.text_color)
+        # pyxel.text(185, 130, f"SHRIMP          :{int(self.score_5 / SCORE_5 if self.score_5 != 0 else 0):4}", self.text_color)
+        # pyxel.text(185, 138, f"SAURY           :{int(self.score_6 / SCORE_6 if self.score_6 != 0 else 0):4}", self.text_color)
+        # pyxel.text(185, 146, f"SUSHI-7         :{int(self.score_sushiall / SCORE_SUSHIALL if self.score_sushiall != 0 else 0):4} times", self.text_color)
+        # pyxel.text(185, 154, f"HEART           :{int(self.score_heart / SCORE_HEART if self.score_heart != 0 else 0):4}", self.text_color)
+        # pyxel.text(185, 162, f"SOYSAUCE PITCHER:{int(self.score_shoyu / SCORE_SHOYU if self.score_shoyu != 0 else 0):4}", self.text_color)
         pyxel.rectb(181, 85, 115, 87, self.text_color)
 
     def draw_howtoplay(self):
@@ -894,6 +1037,8 @@ class App:
         draw_list(items)
         # シャリ弾
         draw_list(shari_bullets)
+        # 星弾
+        draw_list(star_bullets)
         # 敵寿司ネタ
         draw_list(sushineta)
         # 着弾時衝撃波
@@ -921,6 +1066,7 @@ class App:
             self.hiscore_updt_flg = True
         draw_list(items)
         draw_list(shari_bullets)
+        draw_list(star_bullets)
         draw_list(sushineta)
         draw_list(blasts)
         draw_list(shoyu_bullets)
@@ -1055,12 +1201,15 @@ class MIKU(SATELLITE):
         self.dy = 0
         self.hp = MIKU_HP
         self.after_damage_frame = 0
+        self.feather_flg = 0 # feather状態
         self.addspeed = 0
         self.accelerated_speed = accelerated_speed
         self.accelerated = False
         # 軌跡描画用の座標記録配列
         self.trajectory_point = []
         self.trajectory_point.append([self.x, self.y])
+        # bulletカウント
+        self.bullet_cnt = 0
         
     def update_btn(self):
         # 増分を初期化
@@ -1109,10 +1258,17 @@ class MIKU(SATELLITE):
         if (self.FLG_ROT):
             super().update()
 
-    def update_shari(self):
+    def update_bullet(self):
         if pyxel.btnp(pyxel.KEY_SPACE) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_A):
-            SHARI(self.x + (MIKU_WIDTH - BULLET_WIDTH) / 2, self.y - BULLET_HEIGHT / 2, self.addspeed)
-            pyxel.play(1, 4)
+            # 弾発射をカウント
+            self.bullet_cnt += 1
+            # 5発に1発徹甲弾--==★ 通常はシャリを投げる
+            if(self.bullet_cnt % 5 == 0):
+                STAR(self.x + (MIKU_WIDTH - BULLET_WIDTH) / 2, self.y - BULLET_HEIGHT / 2, self.addspeed)
+                pyxel.play(2, 16)
+            else:
+                SHARI(self.x + (MIKU_WIDTH - BULLET_WIDTH) / 2, self.y - BULLET_HEIGHT / 2, self.addspeed)
+                pyxel.play(1, 4)
 
     def update_laser(self):
         if pyxel.btnp(pyxel.KEY_V) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_B):
@@ -1148,9 +1304,9 @@ class MIKU(SATELLITE):
         # 被弾後フレームカウント有効中は点滅表示（描画無し／キャラ描画をフレームごとに切替）とする。
         # 通常、被弾後フレームカウントは0なので、余り0のとき描画を行うようにする。
         if (self.after_damage_frame % 2 == 0):
-            pyxel.blt(self.x, self.y, \
-             1, 0, 16*(pyxel.frame_count % 8), 16, 16, 0)
-
+            # feather状態(0/1)によってmikuの姿の描画を切り替える
+                pyxel.blt(self.x, self.y, 1, self.feather_flg * 48, 16*(pyxel.frame_count % 8), 16, 16, 0)
+            
     def draw_flow(self): # 描画処理（流れる）
         pyxel.blt((pyxel.frame_count  + self.x) % pyxel.width, \
              self.y, \
@@ -1353,6 +1509,26 @@ class SHARI(GameObject):
 
     def draw(self):
         pyxel.blt(self.x, self.y, 1, 16, 128 + 8*(pyxel.frame_count % 2), 8, 8, 0)
+
+class STAR(GameObject):
+    def __init__(self, x, y, addspeed):
+        # 射出時点の指定座標で生成
+        self.x = x
+        self.y = y
+        self.w = STAR_BULLET_WIDTH
+        self.h = STAR_BULLET_HEIGHT
+        self.is_alive = True
+        self.addspeed = addspeed
+        star_bullets.append(self)
+
+    def update(self):
+        self.x += STAR_BULLET_SPEED + self.addspeed
+        # 射出方向の画面端（今回はX軸方向）に達したとき弾の存在フラグを消す
+        if self.x + self.w - 1 > pyxel.width:
+            self.is_alive = False
+
+    def draw(self):
+        pyxel.blt(self.x, self.y, 1, 16, 144 + 16*(pyxel.frame_count % 4), 16, 16, 0)
 
 class ITEM(GameObject):
     # 各種アイテム
