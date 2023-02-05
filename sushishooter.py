@@ -38,7 +38,7 @@ MIKU_WIDTH  = 16
 MIKU_SPEED = 5
 MIKU_HP = 3
 AFTER_DAMAGE_FRAME = 24
-# 寿司ネタ敵
+# アイテム
 ITEM_WIDTH   = 16
 ITEM_HEIGHT  = 16
 ITEM_SPEED   = 2
@@ -46,6 +46,11 @@ ITEM_SPEED   = 2
 ENEMY_WIDTH   = 16
 ENEMY_HEIGHT  = 16
 ENEMY_SPEED   = 3
+# 寿司桶敵
+SUSHIOKE_WIDTH  = 32
+SUSHIOKE_HEIGHT = 32
+SUSHIOKE_SPEED  = 2
+SUSHIOKE_HP     = 12
 # シャリ弾
 BULLET_WIDTH  = 8
 BULLET_HEIGHT = 8
@@ -54,8 +59,13 @@ BULLET_SPEED  = 4
 STAR_BULLET_WIDTH  = 16
 STAR_BULLET_HEIGHT = 16
 STAR_BULLET_SPEED  = 5
-# レーザー弾
+# レーザー弾（自弾、敵弾）
 LASER_SPEED  = 8
+LASER_WIDTH = 5
+LASER_HEIGHT = 5
+# バラン弾（レーザーの敵弾バリエーション）
+BALAN_WIDTH = 16
+BALAN_HEIGHT = 16
 # レーザー弾着弾時の衝撃アニメ表示フレーム数
 KIRAKIRA2_CNT = 8
 # 着弾時衝撃
@@ -63,15 +73,14 @@ BLAST_START_RADIUS = 1
 BLAST_END_RADIUS   = 8
 BLAST_COLOR_IN     = 10
 BLAST_COLOR_OUT    = 14
-# 醤油敵
+# 醤油差し（敵）
 SHOYU_WIDTH   = 16
 SHOYU_HEIGHT  = 16
 SHOYU_SPEED   = 5
-# 醤油弾
+# 醤油差しが発射する醤油弾
 SHOYU_BULLET_WIDTH  = 8
 SHOYU_BULLET_HEIGHT = 8
 SHOYU_BULLET_SPEED  = 4
-# 敵レーザー弾
 
 # 7つ寿司を揃えた時のキラキラ表示frame_count
 KIRAKIRA_CNT = 24
@@ -87,6 +96,7 @@ SCORE_6 = 7
 SCORE_SUSHIALL = 200
 SCORE_HEART = 100
 SCORE_SHOYU = 40
+SCORE_SUSHIOKE = 300
 # 加速アイテムを取得した際の有効時間（frame数）
 ACCELERATED_TIME = 100
 # 加速アイテム取得による増分
@@ -106,10 +116,13 @@ blasts = []
 shoyu = []
 # 醬油弾
 shoyu_bullets = []
+# 寿司桶
+sushioke = []
 # 星弾
 star_bullets = []
 # レーザー弾
 lasers = []
+# レーザー弾（敵）
 lasers_enemy = []
 #-----------------------------------------------
 # 敵homing用の自機の座標
@@ -260,6 +273,7 @@ class App:
         self.score_heart_get = 0
         self.score_sushiall_get = 0
         self.score_shoyu_get = 0
+        self.score_sushioke_get = 0
         # 得点の初期化
         self.score_0 = 0
         self.score_1 = 0
@@ -272,11 +286,14 @@ class App:
         self.score_sushiall = 0
         self.score_shoyu = 0
         self.score_total = 0
+        self.score_sushioke = 0
         self.hi_score = 0
         self.hiscore_updt_flg = False
         self.game_mode = INVINCIBLE_MODE # 起動時点では無敵（無限モード）
         self.selectdelay_cnt = 0
         self.accelerated_time = 0
+        self.boss_exist = False
+        self.after_bossdeath_cnt = 0
 
         # Mikuを準備
         # Miku自身SATELLITEを継承。
@@ -362,7 +379,11 @@ class App:
                 self.post_tweet()
 
     def update_play_scene(self):
-        
+        # 寿司桶の爆散確認(基本的に同時出現数は１だけなので、最も後方にappendされた要素を確認する)
+        if(len(sushioke)>0):
+            if(sushioke[len(sushioke)-1].is_alive == False):
+                self.boss_exist = False
+
         self.miku.update_recordxy() # 現在位置の記録
         self.miku.update_bullet() # シャリ弾／星弾の射出
         self.miku.update_laser() # レーザーの射出
@@ -381,6 +402,9 @@ class App:
         update_list(sushineta) # 敵寿司ネタの状態を更新
         cleanup_list(sushineta)
 
+        update_list(sushioke) # 敵寿司桶の状態を更新
+        cleanup_list(sushioke)
+
         update_list(shoyu_bullets) # 醤油弾の状態を更新
         cleanup_list(shoyu_bullets)
 
@@ -391,7 +415,11 @@ class App:
         cleanup_list(lasers_enemy)
 
         for enemy in shoyu:
-            enemy.update_shoyu_bullet() # 醤油弾の射出
+            enemy.update_shoyu_bullet() # 醤油からの弾の射出
+
+        if(self.boss_exist):
+            for enemy in sushioke:
+                enemy.update_sushioke_bullet() # 寿司桶からの弾の射出
 
         update_list(shoyu) # 敵醤油の状態を更新
         cleanup_list(shoyu)
@@ -437,6 +465,18 @@ class App:
             self.addspeed = 2 if self.game_mode == HARD_MODE else 0
             SHOYU(pyxel.width, pyxel.rndi(0, pyxel.height - SHOYU_HEIGHT), self.addspeed) 
 
+        # 寿司桶（BOSS）を生成 : X座標、Y座標
+        # 指定frame毎にボスが生成済みか確認して1匹生成
+        if(pyxel.frame_count % 360 == 0):
+            if(not(self.boss_exist)):
+            # if (self.after_bossdeath_cnt == 10):
+                self.addspeed = 1 if self.game_mode == HARD_MODE else 0
+                SUSHIOKE(pyxel.width, (pyxel.height/2) - SUSHIOKE_HEIGHT, self.addspeed) 
+                self.boss_exist = True
+            #     self.after_bossdeath_cnt = 0
+            # else:
+            #     self.after_bossdeath_cnt += 1
+ 
         # アイテムを生成 : X座標、Y座標、パターン指定（0:ハート 1:加速アイテム）、調整スピード
         # frame_count 指定値毎に生成。
         # game_modeで生成頻度を変える。
@@ -557,6 +597,28 @@ class App:
                     )
                     pyxel.play(1, 5)
 
+        # 寿司桶とシャリの当たり判定
+        for enemy in sushioke:
+            for bullet in shari_bullets:
+                if (
+                    enemy.y + enemy.h > bullet.y
+                    and bullet.y + bullet.h > enemy.y
+                    and enemy.x + enemy.w > bullet.x
+                    and bullet.x + bullet.w > enemy.x
+                ):
+                    point = 0
+                    enemy.hp -= 1
+                    if(enemy.hp == 0):
+                        point = (SCORE_SUSHIOKE * (1 + self.miku.feather_flg))
+                        self.score_sushioke += point
+                        self.score_sushioke_get += 1
+                        enemy.afterdeath_cnt = 1
+                    bullet.is_alive = False
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2, point)
+                    )
+                    pyxel.play(1, 5)
+
         # 醤油（弾）とシャリの当たり判定
         for enemy in shoyu_bullets:
             for bullet in shari_bullets:
@@ -585,7 +647,7 @@ class App:
                     enemy.is_alive = False
                     bullet.is_alive = False
                     blasts.append(
-                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2, 0)
+                        Blast(enemy.x + ENEMY_WIDTH / 2 - 5, enemy.y + ENEMY_HEIGHT / 2 - 5, 0)
                     )
                     pyxel.play(1, 9)
 
@@ -658,6 +720,28 @@ class App:
                     )
                     pyxel.play(1, 5)
 
+        # 寿司桶と星弾の当たり判定
+        for enemy in sushioke:
+            for bullet in star_bullets:
+                if (
+                    enemy.y + enemy.h > bullet.y
+                    and bullet.y + bullet.h > enemy.y
+                    and enemy.x + enemy.w > bullet.x
+                    and bullet.x + bullet.w > enemy.x
+                ):
+                    point = 0
+                    enemy.hp -= 1
+                    if(enemy.hp == 0):
+                        point = (SCORE_SUSHIOKE * (1 + self.miku.feather_flg))
+                        self.score_sushioke += point
+                        self.score_sushioke_get += 1
+                        enemy.afterdeath_cnt = 1
+                    bullet.is_alive = False
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2, point)
+                    )
+                    pyxel.play(1, 5)
+
         # 醤油（弾）と星弾の当たり判定
         for enemy in shoyu_bullets:
             for bullet in star_bullets:
@@ -684,7 +768,7 @@ class App:
                 ):
                     enemy.is_alive = False
                     blasts.append(
-                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2, 0)
+                        Blast(enemy.x + ENEMY_WIDTH / 2 - 5, enemy.y + ENEMY_HEIGHT / 2 - 5, 0)
                     )
                     pyxel.play(1, 9)
 
@@ -762,6 +846,28 @@ class App:
                     blasts[len(blasts)-1].kirakira2 = True
                     blasts[len(blasts)-1].kirakira_cnt = KIRAKIRA2_CNT
                     pyxel.play(1, 15)
+
+        # 寿司桶と自機レーザーの当たり判定
+        for enemy in sushioke:
+            for bullet in lasers:
+                if (
+                    enemy.y + enemy.h > bullet.y
+                    and bullet.y + bullet.h > enemy.y
+                    and enemy.x + enemy.w > bullet.x
+                    and bullet.x + bullet.w > enemy.x
+                ):
+                    point = 0
+                    enemy.hp -= 1
+                    if(enemy.hp == 0):
+                        point = (SCORE_SUSHIOKE * (1 + self.miku.feather_flg))
+                        self.score_sushioke += point
+                        self.score_sushioke_get += 1
+                        enemy.afterdeath_cnt = 1
+                    bullet.is_alive = False
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2, point)
+                    )
+                    pyxel.play(1, 5)
 
         # 醤油（弾）と自機レーザーの当たり判定
         for enemy in shoyu_bullets:
@@ -923,7 +1029,7 @@ class App:
         # 合計得点の更新
         self.score_total = self.score_0 + self.score_1 + self.score_2 + self.score_3 + \
                            self.score_4 + self.score_5 + self.score_6 + self.score_heart + \
-                           self.score_sushiall + self.score_shoyu
+                           self.score_sushiall + self.score_shoyu + self.score_sushioke
 
     def update_accelerated(self):
         # 加速有効時間が正であれば、残りtimeを減らす
@@ -937,20 +1043,25 @@ class App:
         self.update_gamemode()
         update_list(items)
         update_list(shari_bullets)
+        update_list(star_bullets)
         update_list(sushineta)
         update_list(blasts)
         update_list(shoyu)
         update_list(shoyu_bullets)
         update_list(lasers)
         update_list(lasers_enemy)
+        update_list(sushioke)
+
         cleanup_list(items)
         cleanup_list(sushineta)
         cleanup_list(shari_bullets)
+        cleanup_list(star_bullets)
         cleanup_list(blasts)
         cleanup_list(shoyu)
         cleanup_list(shoyu_bullets)
         cleanup_list(lasers)
         cleanup_list(lasers_enemy)
+        cleanup_list(sushioke)
 
         if(self.game_mode in (INVINCIBLE_MODE, NORMAL_MODE, HARD_MODE)):
             if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(pyxel.GAMEPAD1_BUTTON_X):
@@ -985,6 +1096,7 @@ class App:
         self.score_heart_get = 0
         self.score_sushiall_get = 0
         self.score_shoyu_get = 0
+        self.score_sushioke_get = 0
         # 得点の初期化
         self.score_0 = 0
         self.score_1 = 0
@@ -996,14 +1108,21 @@ class App:
         self.score_heart = 0
         self.score_sushiall = 0
         self.score_shoyu = 0
+        self.score_sushioke = 0
         self.score_total = 0
         self.hiscore_updt_flg = False
+        self.boss_exist = False
+        self.after_bossdeath_cnt = 0
         items.clear()
         sushineta.clear()
         shari_bullets.clear()
+        star_bullets.clear()
         blasts.clear()
         shoyu.clear()
         shoyu_bullets.clear()
+        lasers.clear()
+        lasers_enemy.clear()
+        sushioke.clear()
 
     def draw(self): # 描画処理
         # 画面背景タイルマップを指定
@@ -1025,8 +1144,8 @@ class App:
         elif self.scene == SCENE_GAMEOVER:
             self.draw_gameover_scene()
         # 雪を降らす
-        for i in range(self.snow_all_amount):
-            self.yukiset[i].draw_fall()        
+        # for i in range(self.snow_all_amount):
+        #     self.yukiset[i].draw_fall()        
         # スコア表示
         pyxel.text(10, 2, f"SCORE {self.score_total:5}", 7)
         pyxel.text(230, 2, f"HI-SCORE {self.hi_score:5}", 7)
@@ -1055,17 +1174,19 @@ class App:
     def draw_score_list(self):
         # スコアの画面表
         self.text_color = TEXT_COLOR
-        pyxel.text(185, 77, "YOUR SCORE DETAIL", self.text_color)
-        pyxel.text(185, 90, f"TUNA            :{int(self.score_0_get):4}", self.text_color)
-        pyxel.text(185, 98, f"YELLOWTAIL      :{int(self.score_1_get):4}", self.text_color)
-        pyxel.text(185, 106, f"EGG             :{int(self.score_2_get):4}", self.text_color)
-        pyxel.text(185, 114, f"NEGITORO        :{int(self.score_3_get):4}", self.text_color)
-        pyxel.text(185, 122, f"SALMON          :{int(self.score_4_get):4}", self.text_color)
-        pyxel.text(185, 130, f"SHRIMP          :{int(self.score_5_get):4}", self.text_color)
-        pyxel.text(185, 138, f"SAURY           :{int(self.score_6_get):4}", self.text_color)
-        pyxel.text(185, 146, f"SUSHI-7         :{int(self.score_sushiall_get):4} times", self.text_color)
-        pyxel.text(185, 154, f"HEART           :{int(self.score_heart_get):4}", self.text_color)
-        pyxel.text(185, 162, f"SOYSAUCE PITCHER:{int(self.score_shoyu_get):4}", self.text_color)
+        pyxel.text(185, 69, "YOUR SCORE DETAIL", self.text_color)
+        pyxel.text(185, 82, f"TUNA            :{int(self.score_0_get):4}", self.text_color)
+        pyxel.text(185, 90, f"YELLOWTAIL      :{int(self.score_1_get):4}", self.text_color)
+        pyxel.text(185, 98, f"EGG             :{int(self.score_2_get):4}", self.text_color)
+        pyxel.text(185, 106, f"NEGITORO        :{int(self.score_3_get):4}", self.text_color)
+        pyxel.text(185, 114, f"SALMON          :{int(self.score_4_get):4}", self.text_color)
+        pyxel.text(185, 122, f"SHRIMP          :{int(self.score_5_get):4}", self.text_color)
+        pyxel.text(185, 130, f"SAURY           :{int(self.score_6_get):4}", self.text_color)
+        pyxel.text(185, 138, f"SUSHI-7         :{int(self.score_sushiall_get):4} times", self.text_color)
+        pyxel.text(185, 146, f"HEART           :{int(self.score_heart_get):4}", self.text_color)
+        pyxel.text(185, 154, f"SOYSAUCE PITCHER:{int(self.score_shoyu_get):4}", self.text_color)
+        pyxel.text(185, 162, f"SUSHIOKE(BOSS)  :{int(self.score_sushioke_get):4}", self.text_color)
+        
         # pyxel.text(185, 90, f"TUNA            :{int(self.score_0 / SCORE_0 if self.score_0 != 0 else 0):4}", self.text_color)
         # pyxel.text(185, 98, f"YELLOWTAIL      :{int(self.score_1 / SCORE_1 if self.score_1 != 0 else 0):4}", self.text_color)
         # pyxel.text(185, 106, f"EGG             :{int(self.score_2 / SCORE_2 if self.score_2 != 0 else 0):4}", self.text_color)
@@ -1076,7 +1197,7 @@ class App:
         # pyxel.text(185, 146, f"SUSHI-7         :{int(self.score_sushiall / SCORE_SUSHIALL if self.score_sushiall != 0 else 0):4} times", self.text_color)
         # pyxel.text(185, 154, f"HEART           :{int(self.score_heart / SCORE_HEART if self.score_heart != 0 else 0):4}", self.text_color)
         # pyxel.text(185, 162, f"SOYSAUCE PITCHER:{int(self.score_shoyu / SCORE_SHOYU if self.score_shoyu != 0 else 0):4}", self.text_color)
-        pyxel.rectb(181, 85, 115, 87, self.text_color)
+        pyxel.rectb(181, 77, 115, 95, self.text_color)
 
     def draw_howtoplay(self):
         # 遊び方表示
@@ -1161,6 +1282,8 @@ class App:
         draw_list(sushineta)
         # 敵醤油
         draw_list(shoyu) 
+        # 寿司桶
+        draw_list(sushioke) 
         # 醤油弾
         draw_list(shoyu_bullets)
         # 敵レーザー
@@ -1173,7 +1296,6 @@ class App:
         draw_list(lasers)
         # 衝撃波
         draw_list(blasts)
-        
 
         # 7種寿司を揃えたことの文字を表示し、キラキラ用ブラスト表示フレームカウントを減らす
         if(self.kirakira_cnt > 0):
@@ -1456,8 +1578,13 @@ class LASER():
         self.target_x = target_x
         self.target_y = target_y
         self.addspeed = addspeed
-        self.w = 3
-        self.h = 3
+        # 自機弾か敵弾か
+        self.bullet_kind = bullet_kind
+        # 弾頭画像に基づくサイズ
+        if(bullet_kind == 2):
+            self.w, self.h = BALAN_WIDTH, BALAN_HEIGHT
+        else:
+            self.w, self.h = LASER_WIDTH, LASER_HEIGHT
         self.pre_shotangle = 0
         self.shot_angle = 0
         self.angle_uv = 0
@@ -1471,65 +1598,74 @@ class LASER():
         # 軌跡描画用の座標記録配列
         self.trajectory_point = []
         self.trajectory_point.append([self.x, self.y])
-        # 自機弾か敵弾か
-        self.bullet_kind = bullet_kind
+
         ### -------draw用の射出方向決定処理
         # 自機弾か敵弾かでターゲットを決める
         if (self.bullet_kind == 0):
             # 最も近い敵性オブジェクトを判定しターゲット座標に指定する
             self.update_nearest_obj()
-        if (self.bullet_kind == 1):
+        if (self.bullet_kind == 1 or self.bullet_kind == 2):
             # mikuの座標を指定する
             self.target_x, self.target_y =  miku_xy[0][0], miku_xy[0][1]
         self.update_targetlock()
         self.is_alive = True
         if (self.bullet_kind == 0):
             lasers.append(self)
-        if (self.bullet_kind == 1):
+        if (self.bullet_kind == 1 or self.bullet_kind == 2):
             lasers_enemy.append(self)
 
     def update(self):
+        # 従前の角度を退避
         pre_angle = self.angle_uv
-        # 自機弾か敵弾かで何をターゲットにするか決める
-        if (self.bullet_kind == 0):
-            # 最も近い敵性オブジェクトを判定しターゲット座標に指定する
-            self.update_nearest_obj()
-        if (self.bullet_kind == 1):
-            # mikuの座標を指定する
-            self.target_x, self.target_y = miku_xy[0][0], miku_xy[0][1]
-        # ターゲット座標とレーザーの現在座標から進行方向角度を更新する
-        if((self.bullet_kind == 0) or (self.bullet_kind == 1 and self.target_x < self.x)):
-            self.update_targetlock() 
-        # # 自機が敵弾をよけようとして敵弾進行方向に一定角度がつくときは、敵弾は従前の角度を保って飛ぶ
-        # if (self.bullet_kind == 1):
-        #     self.update_check_upperangle(pre_angle)
+        # 自機より後方の敵弾は従前の角度を保って飛ぶ
+        if (self.bullet_kind == 1 or self.bullet_kind == 2) and (self.x <= self.target_x):
+            # if (not(pre_angle == 0)):
+            self.angle_uv = pre_angle
+        else:        
+            # 自機弾か敵弾かで何をターゲットにして進行方向を決定するか決める
+            # >>自機弾
+            if (self.bullet_kind == 0):
+                # 最も近い敵性オブジェクトを判定しターゲット座標に指定する
+                self.update_nearest_obj()            
+            # >>敵弾
+            if (self.bullet_kind == 1 or self.bullet_kind == 2):
+                # mikuの座標を指定する
+                self.target_x, self.target_y = miku_xy[0][0], miku_xy[0][1]
+            # ターゲット座標とレーザーの現在座標から進行方向角度を更新する
+            if((self.bullet_kind == 0) or (self.bullet_kind == 1 and self.target_x < self.x) or (self.bullet_kind == 2 and self.target_x < self.x)):
+                self.update_targetlock() 
+        
         # Speedと進行方向角度に基づいて進行、レーザー座標を更新する
         self.update_xy()
 
     def check_nearest_forward_obj_axis(self, list):
         # 指定のリストオブジェクトのうち最も近いものの座標を返す
+        # 返却用座標変数・返却用距離変数の初期値として画面端と画面幅をセット
         rtn_x, rtn_y = pyxel.width, self.y
         rtn_distance = pyxel.width
         for elem in list:
-            # 存在フラグが有効なものについてのみ距離を測る
+            # 存在フラグが有効なもの　かつ　攻撃対象がX軸方向について前方にあるもの  について距離を測る
             if (elem.is_alive and elem.x >= self.x):
                 distance = math.sqrt((elem.x - self.x)**2 + (elem.y - self.y)**2)
+                # 計算結果が保持中の評価用距離変数以下の場合、返却用座標と返却用距離を更新する
                 if (distance <= rtn_distance):
                     (rtn_x, rtn_y) = (elem.x, elem.y)
                     rtn_distance = distance
-        return (rtn_x, rtn_y)
+        return (rtn_x, rtn_y, rtn_distance)
 
     def update_nearest_obj(self):
-            # 最も近い攻撃可能オブジェクトの座標を取得し、ターゲットとする
-            tmp_x1, tmp_y1 = self.check_nearest_forward_obj_axis(sushineta)
-            tmp_x2, tmp_y2 = self.check_nearest_forward_obj_axis(shoyu)
-            tmp_x3, tmp_y3 = self.check_nearest_forward_obj_axis(shoyu_bullets)
-            tmp_x4, tmp_y4 = self.check_nearest_forward_obj_axis(lasers_enemy)
-            distance1 = math.sqrt((tmp_x1 - self.x)**2 + (tmp_y1 - self.y)**2)
-            distance2 = math.sqrt((tmp_x2 - self.x)**2 + (tmp_y2 - self.y)**2)
-            distance3 = math.sqrt((tmp_x3 - self.x)**2 + (tmp_y3 - self.y)**2)
-            distance4 = math.sqrt((tmp_x4 - self.x)**2 + (tmp_y4 - self.y)**2)            
-            distance = min(distance1, distance2, distance3, distance4)
+            # 攻撃可能オブジェクトリストからそれぞれ最も近い座標を取得し、それらのターゲットとする
+            tmp_x1, tmp_y1, distance1 = self.check_nearest_forward_obj_axis(sushineta)
+            tmp_x2, tmp_y2, distance2 = self.check_nearest_forward_obj_axis(shoyu)
+            tmp_x3, tmp_y3, distance3 = self.check_nearest_forward_obj_axis(shoyu_bullets)
+            tmp_x4, tmp_y4, distance4 = self.check_nearest_forward_obj_axis(lasers_enemy)
+            tmp_x5, tmp_y5, distance5 = self.check_nearest_forward_obj_axis(sushioke)
+            # distance1 = math.sqrt((tmp_x1 - self.x)**2 + (tmp_y1 - self.y)**2)
+            # distance2 = math.sqrt((tmp_x2 - self.x)**2 + (tmp_y2 - self.y)**2)
+            # distance3 = math.sqrt((tmp_x3 - self.x)**2 + (tmp_y3 - self.y)**2)
+            # distance4 = math.sqrt((tmp_x4 - self.x)**2 + (tmp_y4 - self.y)**2)
+            # distance5 = math.sqrt((tmp_x5 - self.x)**2 + (tmp_y5 - self.y)**2)
+            distance = min(distance1, distance2, distance3, distance4, distance5)
             # 最も近い敵性オブジェクト迄の距離が一定値以下になると、自身を加速させる
             if (distance <= 15):
                 self.speed += 1
@@ -1540,8 +1676,10 @@ class LASER():
                 self.nearest_x, self.nearest_y = tmp_x2, tmp_y2
             elif(distance == distance3):
                 self.nearest_x, self.nearest_y = tmp_x3, tmp_y3
-            else:
+            elif(distance == distance4):
                 self.nearest_x, self.nearest_y = tmp_x4, tmp_y4
+            else:
+                self.nearest_x, self.nearest_y = tmp_x5, tmp_y5
             self.target_x, self.target_y = self.nearest_x, self.nearest_y
 
     def update_targetlock(self):
@@ -1565,6 +1703,7 @@ class LASER():
         self.update_dudv(self.dx, self.dy, self.ux, self.uy, self.vx, self.vy)
         # uv座標系での進行方向angle_uv
         self.update_angleuv(self.du, self.dv)
+
     def update_vector_u(self, speed, angle):
         self.ux = speed * pyxel.cos(angle)
         self.uy = speed * pyxel.sin(angle)
@@ -1575,7 +1714,7 @@ class LASER():
         if self.bullet_kind == 0:
             self.du = dx * ux + dy * uy
             self.dv = dx * vx + dy * vy
-        if self.bullet_kind == 1:
+        if (self.bullet_kind == 1 or self.bullet_kind == 2):
             self.du = -(dx * ux + dy * uy)
             self.dv = -(dx * vx + dy * vy)
     def update_angleuv(self, du, dv):
@@ -1590,6 +1729,7 @@ class LASER():
             self.angle_uv = pre_angle
 
     def update_xy(self):
+        # 極座標計算によるXY座標系の位置更新
         self.x += pyxel.ceil(self.speed * pyxel.cos(self.angle_uv))
         self.y += pyxel.ceil(self.speed * pyxel.sin(self.angle_uv))
         # 軌跡を描画するために座標履歴を保持する
@@ -1600,6 +1740,11 @@ class LASER():
         if self.x > pyxel.width:
             self.is_alive = False
         if self.x < 0:
+            self.is_alive = False
+        # 画面上下を10pixel超えると存在フラグを折る
+        if self.y < - 10:
+            self.is_alive = False
+        if self.y > pyxel.height + 10:
             self.is_alive = False
 
     def draw(self):
@@ -1626,7 +1771,30 @@ class LASER():
                 pyxel.line(self.trajectory_point[1][0], self.trajectory_point[1][1], self.trajectory_point[2][0], self.trajectory_point[2][1], 8)
             if (len(self.trajectory_point)>=2):
                 pyxel.line(self.trajectory_point[0][0], self.trajectory_point[0][1], self.trajectory_point[1][0], self.trajectory_point[1][1], 4)
-                pyxel.blt(self.x - 2, self.y - 2, 1, 5, 160 + 5*(pyxel.frame_count % 4), 5, 5, 0)
+            pyxel.blt(self.x - 2, self.y - 2, 1, 5, 160 + 5*(pyxel.frame_count % 4), 5, 5, 0)
+        # 敵弾（バラン弾頭）
+        if (self.bullet_kind == 2):
+            if (len(self.trajectory_point)>=5):
+                pyxel.line(self.trajectory_point[3][0], self.trajectory_point[3][1],   self.trajectory_point[4][0], self.trajectory_point[4][1],   7)
+                pyxel.line(self.trajectory_point[3][0], self.trajectory_point[3][1]+1, self.trajectory_point[4][0], self.trajectory_point[4][1]+1, 3)
+                pyxel.line(self.trajectory_point[3][0], self.trajectory_point[3][1]+2, self.trajectory_point[4][0], self.trajectory_point[4][1]+2, 7)
+                pyxel.line(self.trajectory_point[3][0], self.trajectory_point[3][1]+3, self.trajectory_point[4][0], self.trajectory_point[4][1]+3, 3)
+                pyxel.line(self.trajectory_point[3][0], self.trajectory_point[3][1]+4, self.trajectory_point[4][0], self.trajectory_point[4][1]+4, 7)
+            if (len(self.trajectory_point)>=4):
+                pyxel.line(self.trajectory_point[2][0], self.trajectory_point[2][1],   self.trajectory_point[3][0], self.trajectory_point[3][1],   11)
+                pyxel.line(self.trajectory_point[2][0], self.trajectory_point[2][1]+1, self.trajectory_point[3][0], self.trajectory_point[3][1]+1,  5)
+                pyxel.line(self.trajectory_point[2][0], self.trajectory_point[2][1]+2, self.trajectory_point[3][0], self.trajectory_point[3][1]+2, 11)
+                pyxel.line(self.trajectory_point[2][0], self.trajectory_point[2][1]+3, self.trajectory_point[3][0], self.trajectory_point[3][1]+3,  5)
+                pyxel.line(self.trajectory_point[2][0], self.trajectory_point[2][1]+4, self.trajectory_point[3][0], self.trajectory_point[3][1]+4, 11)
+            if (len(self.trajectory_point)>=3):
+                pyxel.line(self.trajectory_point[1][0], self.trajectory_point[1][1],   self.trajectory_point[2][0], self.trajectory_point[2][1],   3)
+                pyxel.line(self.trajectory_point[1][0], self.trajectory_point[1][1]+2, self.trajectory_point[2][0], self.trajectory_point[2][1]+2, 3)
+                pyxel.line(self.trajectory_point[1][0], self.trajectory_point[1][1]+4, self.trajectory_point[2][0], self.trajectory_point[2][1]+4, 3)
+            if (len(self.trajectory_point)>=2):
+                pyxel.line(self.trajectory_point[0][0], self.trajectory_point[0][1],   self.trajectory_point[1][0], self.trajectory_point[1][1],   5)
+                pyxel.line(self.trajectory_point[0][0], self.trajectory_point[0][1]+2, self.trajectory_point[1][0], self.trajectory_point[1][1]+2, 5)
+                pyxel.line(self.trajectory_point[0][0], self.trajectory_point[0][1]+4, self.trajectory_point[1][0], self.trajectory_point[1][1]+4, 5)
+            pyxel.blt(self.x - 8, self.y - 5, 1, 48, 128 + 16*(pyxel.frame_count % 8), 16, 16, 0)
 
 class SUSHI(SATELLITE):
     # 初期化
@@ -1788,15 +1956,17 @@ class SHOYU(GameObject):
         pyxel.blt(self.x, self.y, 1, 16, 16*(pyxel.frame_count % 8), -16, 16, 3)
 
     def update_shoyu_bullet(self):
-        if ((pyxel.frame_count + self.timer_offset) % 40 == 10):
-            SHOYUBULLET(self.x + (SHOYU_WIDTH - SHOYU_BULLET_WIDTH) / 2, self.y - SHOYU_BULLET_HEIGHT / 2, self.addspeed)
-            # pyxel.play(0, 4)
-        if ((pyxel.frame_count + self.timer_offset) % 40 == 15):
-            LASER(self.x + (SHOYU_WIDTH - SHOYU_BULLET_WIDTH) / 2, self.y - SHOYU_BULLET_HEIGHT / 2, 0, self.y, self.addspeed, 1)
+        # 自機(miku)の前方にいるときだけ弾を射出する
+        if(miku_xy[0][0] < self.x):
+            if ((pyxel.frame_count + self.timer_offset) % 40 == 10):
+                SHOYUBULLET(self.x + (SHOYU_WIDTH - SHOYU_BULLET_WIDTH) / 2, self.y - SHOYU_BULLET_HEIGHT / 2, self.addspeed, 0)
+                # pyxel.play(0, 4)
+            if ((pyxel.frame_count + self.timer_offset) % 40 == 15):
+                LASER(self.x + (SHOYU_WIDTH - LASER_WIDTH) / 2, self.y - LASER_HEIGHT / 2, 0, self.y, self.addspeed, 1)
 
 
 class SHOYUBULLET(GameObject):
-    def __init__(self, x, y, addspeed):
+    def __init__(self, x, y, addspeed, shooter_flg):
         # 射出時点の指定座標で生成
         self.x = x
         self.y = y
@@ -1804,6 +1974,7 @@ class SHOYUBULLET(GameObject):
         self.h = SHOYU_BULLET_HEIGHT
         self.is_alive = True
         self.addspeed = addspeed
+        self.shooter_flg = shooter_flg
         shoyu_bullets.append(self)
 
     def update(self):
@@ -1813,8 +1984,80 @@ class SHOYUBULLET(GameObject):
             self.is_alive = False
 
     def draw(self):
-        pyxel.blt(self.x, self.y, 1, 24, 128 + 8*(pyxel.frame_count % 2), 8, 8, 0)
+        # 醤油
+        if (self.shooter_flg == 0):
+            pyxel.blt(self.x, self.y, 1, 24, 128 + 8*(pyxel.frame_count % 2), 8, 8, 0)
+        # いくら（醤油漬）
+        if (self.shooter_flg == 1):
+            pyxel.blt(self.x, self.y, 1, 40, 128 + 8*(pyxel.frame_count % 2), 8, 8, 0)
 
+class SUSHIOKE(GameObject):
+    # 寿司桶（敵）
+    def __init__(self, x, y, addspeed):
+        self.addspeed = addspeed
+        self.w = SUSHIOKE_WIDTH
+        self.h = SUSHIOKE_HEIGHT
+        self.x_init = pyxel.width - self.w - 16
+        # self.y_rnd_adjust = pyxel.rndi(0, self.h)
+        self.x = x
+        self.y = y
+        self.dir = -1
+        self.hp = SUSHIOKE_HP
+        self.timer_offset = pyxel.rndi(0, 59)
+        self.is_alive = True
+        self.frame_cnt_wk = 0
+        self.afterdeath_cnt = 0
+        sushioke.append(self)
+
+    def update(self):
+        # x軸初期位置に着いたらy軸移動開始
+        if (self.x <= self.x_init):
+            if (self.y <= (self.h * 1 + 5)):
+                self.dir = 1
+            if (self.y >= (pyxel.height - self.h * 3)):
+                self.dir = -1
+            if (pyxel.frame_count % 1 == 0): # 上下移動スピードを緩慢にさせる
+                if (self.hp > 0): # 残存HPがある場合のみ動作させる
+                    self.y += (SUSHIOKE_SPEED + self.addspeed) * self.dir
+        # 規定のx軸初期位置に着くまで移動する
+        if (self.x >= self.x_init):
+            self.x -= 1
+
+    def draw(self):
+        # 残存HPを持ち死亡後カウントを開始する前は通常用アニメーションで描画する
+        if(self.afterdeath_cnt == 0):
+            if (pyxel.frame_count % 3 == 0):
+                self.frame_cnt_wk += 1
+            pyxel.blt(self.x, self.y, 1, 144, 32*(self.frame_cnt_wk % 7), 32, 32, 15)
+        # HPを失って死亡後カウントが開始されると爆散用のアニメーションで描画する
+        if(self.afterdeath_cnt > 0):
+            pyxel.blt(self.x, self.y, 1, 176, 32*(self.afterdeath_cnt -1), 32, 32, 0)
+            if (pyxel.frame_count % 2 == 0):
+                self.afterdeath_cnt += 1
+            if(self.afterdeath_cnt == 9):
+                self.is_alive = False
+
+    def update_sushioke_bullet(self):
+        # 醤油
+        if ((pyxel.frame_count + self.timer_offset) % 60 ==15):
+            # 4 - 5発
+            SHOYUBULLET(self.x + (SUSHIOKE_WIDTH - SHOYU_BULLET_WIDTH) / 2 +  5, self.y - SHOYU_BULLET_HEIGHT / 2,      self.addspeed, 1)            
+            SHOYUBULLET(self.x + (SUSHIOKE_WIDTH - SHOYU_BULLET_WIDTH) / 2 -  5, self.y - SHOYU_BULLET_HEIGHT / 2 + 10, self.addspeed, 1)
+            # SHOYUBULLET(self.x + (SUSHIOKE_WIDTH - SHOYU_BULLET_WIDTH) / 2 - 10, self.y - SHOYU_BULLET_HEIGHT / 2 + 20, self.addspeed, 1)
+            SHOYUBULLET(self.x + (SUSHIOKE_WIDTH - SHOYU_BULLET_WIDTH) / 2 -  5, self.y - SHOYU_BULLET_HEIGHT / 2 + 30, self.addspeed, 1)
+            SHOYUBULLET(self.x + (SUSHIOKE_WIDTH - SHOYU_BULLET_WIDTH) / 2 +  5, self.y - SHOYU_BULLET_HEIGHT / 2 + 40, self.addspeed, 1)
+        # レーザー弾
+        if ((pyxel.frame_count + self.timer_offset) % 60 == 35):
+            # 2 - 3発
+            LASER(self.x + (SUSHIOKE_WIDTH - LASER_WIDTH) / 2,      self.y - LASER_HEIGHT / 2,      0, self.y, self.addspeed, 1)
+            # LASER(self.x + (SUSHIOKE_WIDTH - LASER_WIDTH) / 2 - 10, self.y - LASER_HEIGHT / 2 + 10, 0, self.y, self.addspeed, 1)
+            LASER(self.x + (SUSHIOKE_WIDTH - LASER_WIDTH) / 2,      self.y - LASER_HEIGHT / 2 + 20, 0, self.y, self.addspeed, 1)
+        # レーザー弾（バラン）
+        if ((pyxel.frame_count + self.timer_offset) % 60 == 55):
+            # 2 - 3発
+            LASER(self.x + (SUSHIOKE_WIDTH - BALAN_WIDTH) / 2 +  8, self.y - BALAN_HEIGHT / 2 -  8, 0, self.y, self.addspeed, 2)
+            # LASER(self.x + (SUSHIOKE_WIDTH - BALAN_WIDTH) / 2 + 16, self.y - BALAN_HEIGHT / 2 + 16, 0, self.y, self.addspeed, 2)
+            LASER(self.x + (SUSHIOKE_WIDTH - BALAN_WIDTH) / 2 +  8, self.y - BALAN_HEIGHT / 2 + 40, 0, self.y, self.addspeed, 2)
 
 class Blast: # 着弾時の衝撃波
     def __init__(self, x, y, point):
