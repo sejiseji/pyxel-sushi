@@ -315,13 +315,13 @@ class App:
         for i in range(7):
             self.sushiset_f.append(SUSHI((6 - i), 17 * i, 183, False, 0, 0, 0, 0, False))
 
-        # 雪を準備 
-        self.snow_all_amount = 50
-        self.flg_weather_snow = True
-        if (self.flg_weather_snow):
-            self.yukiset  = []
-            for i in range(self.snow_all_amount):
-                self.yukiset.append(SNOW(pyxel.rndi(0, pyxel.width), pyxel.rndi(0, pyxel.height), pyxel.rndi(0,1)))
+        # # 雪を準備 
+        # self.snow_all_amount = 30
+        # self.flg_weather_snow = True
+        # if (self.flg_weather_snow):
+        #     self.yukiset  = []
+        #     for i in range(self.snow_all_amount):
+        #         self.yukiset.append(SNOW(pyxel.rndi(0, pyxel.width), pyxel.rndi(0, pyxel.height), pyxel.rndi(0,1)))
 
 
     def update(self): # 更新処理
@@ -471,7 +471,10 @@ class App:
             if(not(self.boss_exist)):
             # if (self.after_bossdeath_cnt == 10):
                 self.addspeed = 1 if self.game_mode == HARD_MODE else 0
-                SUSHIOKE(pyxel.width, (pyxel.height/2) - SUSHIOKE_HEIGHT, self.addspeed) 
+                if(self.game_mode == INVINCIBLE_MODE or self.game_mode == NORMAL_MODE):
+                    SUSHIOKE(pyxel.width, (pyxel.height/2) - SUSHIOKE_HEIGHT, self.addspeed, 0) 
+                if(self.game_mode == HARD_MODE):
+                    SUSHIOKE(pyxel.width, (pyxel.height/2) - SUSHIOKE_HEIGHT, self.addspeed, 1) 
                 self.boss_exist = True
             #     self.after_bossdeath_cnt = 0
             # else:
@@ -608,16 +611,17 @@ class App:
                 ):
                     point = 0
                     enemy.hp -= 1
+                    pyxel.play(1, 5)
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2, point)
+                    )
                     if(enemy.hp == 0):
+                        pyxel.play(2,17)
                         point = (SCORE_SUSHIOKE * (1 + self.miku.feather_flg))
                         self.score_sushioke += point
                         self.score_sushioke_get += 1
                         enemy.afterdeath_cnt = 1
                     bullet.is_alive = False
-                    blasts.append(
-                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2, point)
-                    )
-                    pyxel.play(1, 5)
 
         # 醤油（弾）とシャリの当たり判定
         for enemy in shoyu_bullets:
@@ -731,16 +735,17 @@ class App:
                 ):
                     point = 0
                     enemy.hp -= 1
+                    pyxel.play(1, 5)
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2, point)
+                    )
                     if(enemy.hp == 0):
+                        pyxel.play(2,17)
                         point = (SCORE_SUSHIOKE * (1 + self.miku.feather_flg))
                         self.score_sushioke += point
                         self.score_sushioke_get += 1
                         enemy.afterdeath_cnt = 1
                     bullet.is_alive = False
-                    blasts.append(
-                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2, point)
-                    )
-                    pyxel.play(1, 5)
 
         # 醤油（弾）と星弾の当たり判定
         for enemy in shoyu_bullets:
@@ -858,16 +863,18 @@ class App:
                 ):
                     point = 0
                     enemy.hp -= 1
+                    pyxel.play(1, 5)
+                    blasts.append(
+                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2, point)
+                    )
                     if(enemy.hp == 0):
+                        pyxel.play(2,17)
                         point = (SCORE_SUSHIOKE * (1 + self.miku.feather_flg))
                         self.score_sushioke += point
                         self.score_sushioke_get += 1
                         enemy.afterdeath_cnt = 1
                     bullet.is_alive = False
-                    blasts.append(
-                        Blast(enemy.x + ENEMY_WIDTH / 2, enemy.y + ENEMY_HEIGHT / 2, point)
-                    )
-                    pyxel.play(1, 5)
+
 
         # 醤油（弾）と自機レーザーの当たり判定
         for enemy in shoyu_bullets:
@@ -1993,7 +2000,7 @@ class SHOYUBULLET(GameObject):
 
 class SUSHIOKE(GameObject):
     # 寿司桶（敵）
-    def __init__(self, x, y, addspeed):
+    def __init__(self, x, y, addspeed, hardmode_flg):
         self.addspeed = addspeed
         self.w = SUSHIOKE_WIDTH
         self.h = SUSHIOKE_HEIGHT
@@ -2004,6 +2011,7 @@ class SUSHIOKE(GameObject):
         self.dir = -1
         self.hp = SUSHIOKE_HP
         self.timer_offset = pyxel.rndi(0, 59)
+        self.hardmode_flg = hardmode_flg
         self.is_alive = True
         self.frame_cnt_wk = 0
         self.afterdeath_cnt = 0
@@ -2043,20 +2051,23 @@ class SUSHIOKE(GameObject):
             # 4 - 5発
             SHOYUBULLET(self.x + (SUSHIOKE_WIDTH - SHOYU_BULLET_WIDTH) / 2 +  5, self.y - SHOYU_BULLET_HEIGHT / 2,      self.addspeed, 1)            
             SHOYUBULLET(self.x + (SUSHIOKE_WIDTH - SHOYU_BULLET_WIDTH) / 2 -  5, self.y - SHOYU_BULLET_HEIGHT / 2 + 10, self.addspeed, 1)
-            # SHOYUBULLET(self.x + (SUSHIOKE_WIDTH - SHOYU_BULLET_WIDTH) / 2 - 10, self.y - SHOYU_BULLET_HEIGHT / 2 + 20, self.addspeed, 1)
+            if(self.hardmode_flg == 1):
+                SHOYUBULLET(self.x + (SUSHIOKE_WIDTH - SHOYU_BULLET_WIDTH) / 2 - 10, self.y - SHOYU_BULLET_HEIGHT / 2 + 20, self.addspeed, 1)
             SHOYUBULLET(self.x + (SUSHIOKE_WIDTH - SHOYU_BULLET_WIDTH) / 2 -  5, self.y - SHOYU_BULLET_HEIGHT / 2 + 30, self.addspeed, 1)
             SHOYUBULLET(self.x + (SUSHIOKE_WIDTH - SHOYU_BULLET_WIDTH) / 2 +  5, self.y - SHOYU_BULLET_HEIGHT / 2 + 40, self.addspeed, 1)
         # レーザー弾
         if ((pyxel.frame_count + self.timer_offset) % 60 == 35):
             # 2 - 3発
             LASER(self.x + (SUSHIOKE_WIDTH - LASER_WIDTH) / 2,      self.y - LASER_HEIGHT / 2,      0, self.y, self.addspeed, 1)
-            # LASER(self.x + (SUSHIOKE_WIDTH - LASER_WIDTH) / 2 - 10, self.y - LASER_HEIGHT / 2 + 10, 0, self.y, self.addspeed, 1)
+            if(self.hardmode_flg == 1):
+                LASER(self.x + (SUSHIOKE_WIDTH - LASER_WIDTH) / 2 - 10, self.y - LASER_HEIGHT / 2 + 10, 0, self.y, self.addspeed, 1)
             LASER(self.x + (SUSHIOKE_WIDTH - LASER_WIDTH) / 2,      self.y - LASER_HEIGHT / 2 + 20, 0, self.y, self.addspeed, 1)
         # レーザー弾（バラン）
         if ((pyxel.frame_count + self.timer_offset) % 60 == 55):
             # 2 - 3発
             LASER(self.x + (SUSHIOKE_WIDTH - BALAN_WIDTH) / 2 +  8, self.y - BALAN_HEIGHT / 2 -  8, 0, self.y, self.addspeed, 2)
-            # LASER(self.x + (SUSHIOKE_WIDTH - BALAN_WIDTH) / 2 + 16, self.y - BALAN_HEIGHT / 2 + 16, 0, self.y, self.addspeed, 2)
+            if(self.hardmode_flg == 1):
+                LASER(self.x + (SUSHIOKE_WIDTH - BALAN_WIDTH) / 2 + 16, self.y - BALAN_HEIGHT / 2 + 16, 0, self.y, self.addspeed, 2)
             LASER(self.x + (SUSHIOKE_WIDTH - BALAN_WIDTH) / 2 +  8, self.y - BALAN_HEIGHT / 2 + 40, 0, self.y, self.addspeed, 2)
 
 class Blast: # 着弾時の衝撃波
