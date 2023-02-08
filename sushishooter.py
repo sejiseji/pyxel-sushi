@@ -1137,10 +1137,13 @@ class App:
         pyxel.bltm(0, 0, 0, 0   + pyxel.frame_count % 256, 0, pyxel.width, pyxel.height) # 青海波
 
         # 波を挿入
-        # self.drawdx = math.ceil(3*math.sin(pyxel.frame_count % (360 / 5)))
-        # self.drawdy = math.ceil(5*math.cos(pyxel.frame_count % 360))
-        # pyxel.blt(-8 - self.drawdx, 120 - self.drawdy, \
-        #           0, 0, 144, 176, 112, 0)
+        # 1
+        dx = pyxel.frame_count % pyxel.width
+        dy1 = ((dx - 70)/2)**2 + 130
+        pyxel.blt(dx, dy1, 0, 0, 136, 215, 111, 0)
+        # 2
+        dy2 = ((dx - 115)/2)**2 + 105
+        pyxel.blt(dx, dy2, 0, 0, 136, 215, 111, 0)
 
         # シーン別の描画
         self.background.draw()
