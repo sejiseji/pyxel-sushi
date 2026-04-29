@@ -1,0 +1,12 @@
+
+# Local / generated
+.DS_Store
+__pycache__/
+*.pyc
+.env
+secrets/
+
+# Local analysis / LLM context artifacts
+.kuchinawa/
+ContextPack.txt
+*ContextPack*.txt
